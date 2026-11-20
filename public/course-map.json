@@ -1,0 +1,235 @@
+{
+  "reviewed": "2026-11-20",
+  "courses": [
+    {
+      "id": "dlsys",
+      "title": "Deep Learning Systems",
+      "url": "https://dlsyscourse.org/lectures/",
+      "coverage": "Foundations, reverse-mode differentiation, tensor layouts, training state, convolution, hardware cost models, distributed state, sequence models and generative architectures.",
+      "adaptations": "New CPU-scale implementations fill the framework and training gaps. Existing CNN, RNN, Transformer, generative-model, inference and adaptation labs cover overlapping material. GPU timing and full framework construction remain extensions.",
+      "units": [
+        {
+          "title": "Lectures 2\u20135 \u00b7 classification, backpropagation and autodiff",
+          "tasks": [
+            "course-classifier",
+            "course-autodiff"
+          ]
+        },
+        {
+          "title": "Lectures 6\u20139 \u00b7 optimization and library state",
+          "tasks": [
+            "course-optimizer",
+            "course-normalization",
+            "course-generalization"
+          ]
+        },
+        {
+          "title": "Lectures 10, 12\u201313 \u00b7 array backends and acceleration",
+          "tasks": [
+            "course-tensor-views",
+            "course-tiled-matmul",
+            "block-attention"
+          ]
+        },
+        {
+          "title": "Lectures 11, 14 \u00b7 convolution",
+          "tasks": [
+            "course-convolution-backward",
+            "paper-resnet",
+            "paper-vgg",
+            "paper-unet"
+          ]
+        },
+        {
+          "title": "Lectures 15\u201318 \u00b7 sequence models and attention",
+          "tasks": [
+            "paper-rnn",
+            "paper-lstm",
+            "paper-gru",
+            "paper-transformer",
+            "paper-gpt2"
+          ]
+        },
+        {
+          "title": "Lecture 19 \u00b7 large-model training",
+          "tasks": [
+            "course-loss-scaling",
+            "course-checkpoint-planner",
+            "course-sharded-state",
+            "data-parallel"
+          ]
+        },
+        {
+          "title": "Lectures 20\u201321 \u00b7 generative models",
+          "tasks": [
+            "paper-vae",
+            "paper-gan",
+            "paper-ddpm"
+          ]
+        },
+        {
+          "title": "Lectures 22\u201323 \u00b7 adaptation and deployment",
+          "tasks": [
+            "lora-layer",
+            "chat-sft",
+            "quantized-linear",
+            "kv-cache"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "alchemy",
+      "title": "Deep Learning Alchemy \u00b7 CS312",
+      "url": "https://deep-learning-alchemy.github.io/",
+      "coverage": "Controlled sweeps, budget-dependent conclusions, optimizer trajectories, depth diagnostics, capacity constraints, small-data learning, transfer and reward specification.",
+      "adaptations": "Original prediction prompts use small reproducible experiments and saved notebooks. They do not reproduce the course answer keys or claim toy experiments establish the outcomes of its large training runs. Full \u00b5P/Muon studies, Hessian eigensolvers and GPU sweeps are extension reading.",
+      "units": [
+        {
+          "title": "A1 \u00b7 Basics; prediction quiz",
+          "tasks": [
+            "course-controlled-sweeps",
+            "course-scaling-budget",
+            "release-comparison",
+            "paired-bootstrap"
+          ]
+        },
+        {
+          "title": "A2 \u00b7 Hyperparameter scaling; prediction quiz",
+          "tasks": [
+            "course-optimizer",
+            "course-loss-landscape",
+            "course-generalization"
+          ]
+        },
+        {
+          "title": "A3 \u00b7 Optimization and loss landscapes; prediction quiz",
+          "tasks": [
+            "course-loss-landscape",
+            "course-controlled-sweeps"
+          ]
+        },
+        {
+          "title": "A4 \u00b7 Stability through depth and time; prediction quiz",
+          "tasks": [
+            "course-depth-signal",
+            "course-normalization",
+            "paper-resnet",
+            "paper-rnn",
+            "paper-lstm",
+            "paper-gru",
+            "paper-gated-deltanet",
+            "paper-transformer",
+            "paper-gpt2",
+            "paper-llama"
+          ]
+        },
+        {
+          "title": "A5 \u00b7 Capacity; prediction quiz",
+          "tasks": [
+            "course-head-capacity",
+            "course-expert-capacity",
+            "paper-deepseek-v3"
+          ]
+        },
+        {
+          "title": "A6 \u00b7 Generalization and transfer",
+          "tasks": [
+            "course-generalization",
+            "course-data-curation",
+            "course-packed-evaluation"
+          ]
+        },
+        {
+          "title": "A7 \u00b7 Reinforcement learning and reward design",
+          "tasks": [
+            "course-policy-objective",
+            "course-reward-audit"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cs336",
+      "title": "CS336 \u00b7 Language Modeling from Scratch \u00b7 Spring 2025",
+      "url": "https://cs336.stanford.edu/spring2025/",
+      "coverage": "Tokenization, numerical training components, model architecture, systems accounting, scaling, corpus preparation, likelihood evaluation, supervised adaptation and policy objectives.",
+      "adaptations": "The 2025 assignment handouts inspire scoped tasks with explicit contracts. Existing model and serving labs are reused. Real Triton kernels, distributed network timing, Common Crawl processing and large-model RL runs require local hardware/data beyond this browser runner.",
+      "units": [
+        {
+          "title": "A1 \u00b7 Basics",
+          "url": "https://github.com/stanford-cs336/assignment1-basics/blob/6191c1a18088ec6edce02bad4451e445193abb8b/cs336_spring2025_assignment1_basics.pdf",
+          "tasks": [
+            "course-byte-tokenizer",
+            "course-classifier",
+            "course-tensor-views",
+            "course-optimizer",
+            "course-packed-evaluation",
+            "paper-transformer",
+            "paper-gpt2",
+            "paper-llama"
+          ]
+        },
+        {
+          "title": "A2 \u00b7 Systems",
+          "url": "https://github.com/stanford-cs336/assignment2-systems/blob/e495ed740080661ab084914674d3e10048778889/cs336_spring2025_assignment2_systems.pdf",
+          "tasks": [
+            "course-tiled-matmul",
+            "course-loss-scaling",
+            "course-checkpoint-planner",
+            "course-sharded-state",
+            "block-attention",
+            "data-parallel"
+          ]
+        },
+        {
+          "title": "A3 \u00b7 Scaling and architecture",
+          "url": "https://cs336.stanford.edu/spring2025/",
+          "tasks": [
+            "course-scaling-budget",
+            "course-head-capacity",
+            "course-expert-capacity",
+            "paper-deepseek-v3"
+          ]
+        },
+        {
+          "title": "A4 \u00b7 Data",
+          "url": "https://github.com/stanford-cs336/assignment4-data/blob/5a5f890cd9b72733e6273a596c40b696df3aa9df/cs336_spring2025_assignment4_data.pdf",
+          "tasks": [
+            "course-data-curation",
+            "course-byte-tokenizer",
+            "course-packed-evaluation"
+          ]
+        },
+        {
+          "title": "A5 \u00b7 Alignment and reasoning RL",
+          "url": "https://github.com/stanford-cs336/assignment5-alignment/blob/master/cs336_spring2025_assignment5_alignment.pdf",
+          "tasks": [
+            "chat-sft",
+            "course-policy-objective",
+            "course-reward-audit",
+            "dpo-loss",
+            "lora-layer"
+          ]
+        },
+        {
+          "title": "Inference and evaluation lectures",
+          "url": "https://cs336.stanford.edu/spring2025/",
+          "tasks": [
+            "kv-cache",
+            "live-batching",
+            "paged-cache",
+            "shared-prefix",
+            "speculative-decode",
+            "quantized-linear",
+            "paired-bootstrap",
+            "judge-validation",
+            "release-comparison"
+          ]
+        }
+      ]
+    }
+  ],
+  "new_tasks": 22,
+  "reused_tasks": 28
+}

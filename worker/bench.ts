@@ -6,6 +6,8 @@ import paperCatalog from "../public/paper-catalog.json";
 import paperScenarios from "./paper-cases.json";
 import systemsCatalog from "../public/systems-catalog.json";
 import systemsScenarios from "./systems-cases.json";
+import courseCatalog from "../public/course-new-catalog.json";
+import courseScenarios from "./course-cases.json";
 import releaseCases from "./cases.json";
 import practiceCases from "./practice-cases.json";
 
@@ -13,8 +15,8 @@ import followups from "./practice-followups.json";
 
 type Scenario = { part: number; title: string; actions: any[]; expected: any };
 const sets: Record<string, Scenario[]> = practiceCases;
-const projectScenarios: Record<string, Scenario[]> = {...paperScenarios, ...systemsScenarios};
-const projectFiles=new Map([...paperCatalog, ...systemsCatalog].map(p=>[p.slug,p.editable]));
+const projectScenarios: Record<string, Scenario[]> = {...paperScenarios, ...systemsScenarios, ...courseScenarios};
+const projectFiles=new Map([...paperCatalog, ...systemsCatalog, ...courseCatalog].map(p=>[p.slug,p.editable]));
 const allSlugs=new Set([...catalog.map(row=>row.slug),...projectFiles.keys(),...designSlugs]);
 
 const uuid = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;

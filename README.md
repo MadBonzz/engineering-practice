@@ -18,3 +18,14 @@ The validation checks the reference, untouched starter, independent workload ora
 Submission freezes the editable files server-side. Workloads are disclosed only after submission; CPython replays them in the browser. The server compares the returned observations to its private oracle, records per-part results and shares representative counterexamples. This is a self-practice grader. Native processes, CUDA and independently trusted execution would require an isolated compute service.
 
 For a qualitative postmortem, export the graded snapshot from Review and bring it to Codex with the kit's review rubric. The site itself provides deterministic feedback.
+
+## Course tasks
+
+Open the **Course tasks** tab (`/?track=courses`) for the Deep Learning Systems,
+Deep Learning Alchemy and CS336 Spring 2025 learning paths. The track adds 22
+original three-part labs and reuses 28 existing exercises where topics overlap.
+Tasks include course/assignment references, tests, hints and a saved experiment
+notebook. See [coverage, task index and adaptation limits](COURSE_TASKS.md).
+
+Rebuild course content with `python -B authoring/build_courses.py`.
+See [authoring and validation](authoring/courses/README.md) for all checks.

@@ -1,0 +1,662 @@
+{
+  "course-classifier": {
+    "public_checks": 6,
+    "private_checks": 10,
+    "mutants": [
+      {
+        "file": "log_probs.py",
+        "change": "maximum=max(logits) => maximum=0",
+        "killed_by": "Private workload raised an exception"
+      },
+      {
+        "file": "classifier_gradient.py",
+        "change": "loss-=lp[y]/b => loss-=lp[y]",
+        "killed_by": "Opposite labels cancel"
+      },
+      {
+        "file": "classifier_gradient.py",
+        "change": "-(j==y) => +(j==y)",
+        "killed_by": "Opposite labels cancel"
+      },
+      {
+        "file": "train_classifier.py",
+        "change": "v-lr*g => v+lr*g",
+        "killed_by": "Repeated updates"
+      }
+    ],
+    "reference": "passed",
+    "starter": "fails with NotImplementedError",
+    "input_immutability": "passed",
+    "experiment_runner": "passed"
+  },
+  "course-autodiff": {
+    "public_checks": 6,
+    "private_checks": 11,
+    "mutants": [
+      {
+        "file": "forward_graph.py",
+        "change": "values[p[0]]*values[p[1]] => values[p[0]]+values[p[1]]",
+        "killed_by": "Overlapping roots"
+      },
+      {
+        "file": "reverse_graph.py",
+        "change": "grads[parent]+=g => grads[parent]=g",
+        "killed_by": "Intermediate root"
+      },
+      {
+        "file": "reverse_graph.py",
+        "change": "g*(1-values[i]**2) => g*(1-values[i])",
+        "killed_by": "Nonzero tanh derivative"
+      },
+      {
+        "file": "graph_report.py",
+        "change": "a+b for a,b => b for a,b",
+        "killed_by": "Overlapping roots"
+      }
+    ],
+    "reference": "passed",
+    "starter": "fails with NotImplementedError",
+    "input_immutability": "passed",
+    "experiment_runner": "passed"
+  },
+  "course-tensor-views": {
+    "public_checks": 6,
+    "private_checks": 10,
+    "mutants": [
+      {
+        "file": "view_offsets.py",
+        "change": "offset+sum => 0+sum",
+        "killed_by": "Strided slice"
+      },
+      {
+        "file": "gather_view.py",
+        "change": "storage[i] => storage[0]",
+        "killed_by": "Strided slice"
+      },
+      {
+        "file": "view_vjp.py",
+        "change": "gradient[i]+=g => gradient[i]=g",
+        "killed_by": "Overlapping window"
+      },
+      {
+        "file": "view_offsets.py",
+        "change": "i*s for i,s => i*abs(s) for i,s",
+        "killed_by": "Private workload raised an exception"
+      }
+    ],
+    "reference": "passed",
+    "starter": "fails with NotImplementedError",
+    "input_immutability": "passed",
+    "experiment_runner": "passed"
+  },
+  "course-normalization": {
+    "public_checks": 6,
+    "private_checks": 10,
+    "mutants": [
+      {
+        "file": "batch_stats.py",
+        "change": "/n for j in range(d)]] => /max(1,n-1) for j in range(d)]]",
+        "killed_by": "Two features"
+      },
+      {
+        "file": "normalize_batch.py",
+        "change": "if training else => if not training else",
+        "killed_by": "Frozen buffers"
+      },
+      {
+        "file": "norm_session.py",
+        "change": "u<keep => u<=keep",
+        "killed_by": "Threshold equality"
+      },
+      {
+        "file": "norm_session.py",
+        "change": "x/keep if => x if",
+        "killed_by": "Threshold equality"
+      }
+    ],
+    "reference": "passed",
+    "starter": "fails with NotImplementedError",
+    "input_immutability": "passed",
+    "experiment_runner": "passed"
+  },
+  "course-optimizer": {
+    "public_checks": 6,
+    "private_checks": 10,
+    "mutants": [
+      {
+        "file": "clip_gradient.py",
+        "change": "sum(g*g for g in gradient) => sum(abs(g) for g in gradient)",
+        "killed_by": "Signed clipping"
+      },
+      {
+        "file": "adam_step.py",
+        "change": "state['t']+1 => 1",
+        "killed_by": "Resumed moments"
+      },
+      {
+        "file": "adam_step.py",
+        "change": "w*(1-lr*decay) => w",
+        "killed_by": "Two optimizer steps"
+      },
+      {
+        "file": "optimize.py",
+        "change": "sum(x['count'] for x in batch) => len(batch)",
+        "killed_by": "Unequal microbatches"
+      }
+    ],
+    "reference": "passed",
+    "starter": "fails with NotImplementedError",
+    "input_immutability": "passed",
+    "experiment_runner": "passed"
+  },
+  "course-convolution-backward": {
+    "public_checks": 6,
+    "private_checks": 10,
+    "mutants": [
+      {
+        "file": "image_patches.py",
+        "change": "h+2*padding-kernel+1 => h+2*padding-kernel",
+        "killed_by": "Overlapping patches"
+      },
+      {
+        "file": "filter_forward.py",
+        "change": "flat=[v for row in weights for v in row] => flat=[v for row in weights[::-1] for v in row[::-1]]",
+        "killed_by": "Padded cross-correlation"
+      },
+      {
+        "file": "filter_backward.py",
+        "change": "dx[y][x]+= => dx[y][x]=",
+        "killed_by": "Overlap sums"
+      },
+      {
+        "file": "filter_backward.py",
+        "change": "dw[ky][kx]+=g*image[y][x] => dw[ky][kx]+=image[y][x]",
+        "killed_by": "Padding gradient"
+      }
+    ],
+    "reference": "passed",
+    "starter": "fails with NotImplementedError",
+    "input_immutability": "passed",
+    "experiment_runner": "passed"
+  },
+  "course-tiled-matmul": {
+    "public_checks": 6,
+    "private_checks": 10,
+    "mutants": [
+      {
+        "file": "tile_ranges.py",
+        "change": "min(length,i+tile) => i+tile",
+        "killed_by": "Private workload raised an exception"
+      },
+      {
+        "file": "tiled_product.py",
+        "change": "out[i][j]+= => out[i][j]=",
+        "killed_by": "Reduction tail"
+      },
+      {
+        "file": "matmul_plan.py",
+        "change": "elements=m*n => elements=0",
+        "killed_by": "Memory-bound small tiles"
+      },
+      {
+        "file": "matmul_plan.py",
+        "change": "seconds=max(memory,compute) => seconds=min(memory,compute)",
+        "killed_by": "Memory-bound small tiles"
+      }
+    ],
+    "reference": "passed",
+    "starter": "fails with NotImplementedError",
+    "input_immutability": "passed",
+    "experiment_runner": "passed"
+  },
+  "course-loss-scaling": {
+    "public_checks": 6,
+    "private_checks": 11,
+    "mutants": [
+      {
+        "file": "unscale_gradient.py",
+        "change": "abs(g)<=limit => g<=limit",
+        "killed_by": "Negative overflow"
+      },
+      {
+        "file": "scaler_update.py",
+        "change": "good=state['good']+1 => good=state['good']",
+        "killed_by": "Scale growth changes boundary"
+      },
+      {
+        "file": "precision_session.py",
+        "change": "if finite:weights= => if True:weights=",
+        "killed_by": "Atomic skip"
+      },
+      {
+        "file": "precision_session.py",
+        "change": "finite=finite and record['finite'] => finite=record['finite']",
+        "killed_by": "Early microbatch overflow"
+      }
+    ],
+    "reference": "passed",
+    "starter": "fails with NotImplementedError",
+    "input_immutability": "passed",
+    "experiment_runner": "passed"
+  },
+  "course-checkpoint-planner": {
+    "public_checks": 6,
+    "private_checks": 10,
+    "mutants": [
+      {
+        "file": "segment_cost.py",
+        "change": "start+1:end+1 => start:end",
+        "killed_by": "Uneven activation"
+      },
+      {
+        "file": "checkpoint_cost.py",
+        "change": "persistent+scratch => max(persistent,scratch)",
+        "killed_by": "Uneven segments"
+      },
+      {
+        "file": "choose_checkpoints.py",
+        "change": "cost['peak']<=budget => cost['peak']<budget",
+        "killed_by": "Interior checkpoint"
+      },
+      {
+        "file": "choose_checkpoints.py",
+        "change": "if not plans:return None => if not plans:return {}",
+        "killed_by": "No plan fits this budget."
+      }
+    ],
+    "reference": "passed",
+    "starter": "fails with NotImplementedError",
+    "input_immutability": "passed",
+    "experiment_runner": "passed"
+  },
+  "course-sharded-state": {
+    "public_checks": 6,
+    "private_checks": 10,
+    "mutants": [
+      {
+        "file": "shard_ranges.py",
+        "change": "rank<r => rank<=r",
+        "killed_by": "No parameters"
+      },
+      {
+        "file": "reduce_scatter.py",
+        "change": "total=sum(counts) => total=len(counts)",
+        "killed_by": "More ranks than parameters"
+      },
+      {
+        "file": "sharded_step.py",
+        "change": "w-lr*g => w+lr*g",
+        "killed_by": "Single worker"
+      },
+      {
+        "file": "sharded_step.py",
+        "change": "4*(b-a)*bytes_per_element => 4*len(weights)*bytes_per_element",
+        "killed_by": "Example counts differ across ranks."
+      }
+    ],
+    "reference": "passed",
+    "starter": "fails with NotImplementedError",
+    "input_immutability": "passed",
+    "experiment_runner": "passed"
+  },
+  "course-byte-tokenizer": {
+    "public_checks": 6,
+    "private_checks": 10,
+    "mutants": [
+      {
+        "file": "merge_pair.py",
+        "change": "i+=2 => i+=1",
+        "killed_by": "Two matches"
+      },
+      {
+        "file": "learn_merges.py",
+        "change": "-counts[p] => counts[p]",
+        "killed_by": "Frequency and hierarchy"
+      },
+      {
+        "file": "learn_merges.py",
+        "change": "sequences=[list(text.encode('utf-8')) for text in documents] => sequences=[list(''.join(documents).encode('utf-8'))]",
+        "killed_by": "Training never invents a cross-document merge."
+      },
+      {
+        "file": "tokenize.py",
+        "change": "for a,b,new in merges:row= => for a,b,new in merges[::-1]:row=",
+        "killed_by": "A frequent pair is merged before a pair of merged tokens."
+      }
+    ],
+    "reference": "passed",
+    "starter": "fails with NotImplementedError",
+    "input_immutability": "passed",
+    "experiment_runner": "passed"
+  },
+  "course-data-curation": {
+    "public_checks": 6,
+    "private_checks": 12,
+    "mutants": [
+      {
+        "file": "canonical_words.py",
+        "change": "text.casefold() => text.lower()",
+        "killed_by": "Unicode held-out fold"
+      },
+      {
+        "file": "shingles.py",
+        "change": "max(1,len(words)-width+1) => max(0,len(words)-width+1)",
+        "killed_by": "Short held-out text"
+      },
+      {
+        "file": "curate.py",
+        "change": "similar(s,b)>=threshold => similar(s,b)>threshold",
+        "killed_by": "Only kept representatives"
+      },
+      {
+        "file": "curate.py",
+        "change": "else:kept.append(row['id']);seen.append(s) => else:kept.append(row['id'])",
+        "killed_by": "Only kept representatives"
+      }
+    ],
+    "reference": "passed",
+    "starter": "fails with NotImplementedError",
+    "input_immutability": "passed",
+    "experiment_runner": "passed"
+  },
+  "course-packed-evaluation": {
+    "public_checks": 6,
+    "private_checks": 10,
+    "mutants": [
+      {
+        "file": "document_stream.py",
+        "change": "len(doc)+1 => len(doc)",
+        "killed_by": "Private workload raised an exception"
+      },
+      {
+        "file": "pack_windows.py",
+        "change": "i+1<len(tokens) and segments[i]==segments[i+1] => i+1<len(tokens)",
+        "killed_by": "Boundary inside block"
+      },
+      {
+        "file": "corpus_loss.py",
+        "change": "if mask: => if True:",
+        "killed_by": "Unequal scoring counts"
+      },
+      {
+        "file": "corpus_loss.py",
+        "change": "loss/count if count => loss/len(windows) if count",
+        "killed_by": "Unequal scoring counts"
+      }
+    ],
+    "reference": "passed",
+    "starter": "fails with NotImplementedError",
+    "input_immutability": "passed",
+    "experiment_runner": "passed"
+  },
+  "course-scaling-budget": {
+    "public_checks": 6,
+    "private_checks": 10,
+    "mutants": [
+      {
+        "file": "fit_power.py",
+        "change": "exponent=-slope => exponent=slope",
+        "killed_by": "Square-root scaling"
+      },
+      {
+        "file": "predicted_loss.py",
+        "change": "return floor+ => return 0+",
+        "killed_by": "Both resources grow"
+      },
+      {
+        "file": "allocate_compute.py",
+        "change": "compute<=budget => compute<budget",
+        "killed_by": "Lexical tie"
+      },
+      {
+        "file": "allocate_compute.py",
+        "change": "loss,compute,key=min(plans) => loss,compute,key=max(plans)",
+        "killed_by": "Lexical tie"
+      }
+    ],
+    "reference": "passed",
+    "starter": "fails with NotImplementedError",
+    "input_immutability": "passed",
+    "experiment_runner": "passed"
+  },
+  "course-policy-objective": {
+    "public_checks": 6,
+    "private_checks": 10,
+    "mutants": [
+      {
+        "file": "group_advantages.py",
+        "change": "r-mean => r",
+        "killed_by": "Separate prompts"
+      },
+      {
+        "file": "clipped_objective.py",
+        "change": "min(ratio*advantage,bounded*advantage) => max(ratio*advantage,bounded*advantage)",
+        "killed_by": "Lower clipped bound"
+      },
+      {
+        "file": "clipped_objective.py",
+        "change": "if keep: => if True:",
+        "killed_by": "Masked rollout"
+      },
+      {
+        "file": "policy_report.py",
+        "change": "loss=-sum(flat) => loss=sum(flat)",
+        "killed_by": "Masked first rollout"
+      }
+    ],
+    "reference": "passed",
+    "starter": "fails with NotImplementedError",
+    "input_immutability": "passed",
+    "experiment_runner": "passed"
+  },
+  "course-controlled-sweeps": {
+    "public_checks": 6,
+    "private_checks": 10,
+    "mutants": [
+      {
+        "file": "final_records.py",
+        "change": "row['step']==budget => row['step']<=budget",
+        "killed_by": "Early checkpoint ignored"
+      },
+      {
+        "file": "paired_effect.py",
+        "change": "trial[s]-base[s] => base[s]-trial[s]",
+        "killed_by": "Sample standard error"
+      },
+      {
+        "file": "paired_effect.py",
+        "change": "/(len(delta)-1)/len(delta) => /len(delta)/len(delta)",
+        "killed_by": "Sample standard error"
+      },
+      {
+        "file": "select_recipe.py",
+        "change": "by[name][s]['validation'] => by[name][s]['test']",
+        "killed_by": "Global common seed"
+      }
+    ],
+    "reference": "passed",
+    "starter": "fails with NotImplementedError",
+    "input_immutability": "passed",
+    "experiment_runner": "passed"
+  },
+  "course-loss-landscape": {
+    "public_checks": 6,
+    "private_checks": 10,
+    "mutants": [
+      {
+        "file": "quadratic_state.py",
+        "change": "loss=.5*sum => loss=1.0*sum",
+        "killed_by": "Cross curvature"
+      },
+      {
+        "file": "momentum_path.py",
+        "change": "momentum*v+a+n => a+n",
+        "killed_by": "Momentum carries"
+      },
+      {
+        "file": "momentum_path.py",
+        "change": "(1-eta*decay)*x => x",
+        "killed_by": "Noise and decay"
+      },
+      {
+        "file": "landscape_study.py",
+        "change": "runs[n]['losses'][-1] => runs[n]['losses'][0]",
+        "killed_by": "A step safe for one direction can be unstable for a sharper direction."
+      }
+    ],
+    "reference": "passed",
+    "starter": "fails with NotImplementedError",
+    "input_immutability": "passed",
+    "experiment_runner": "passed"
+  },
+  "course-depth-signal": {
+    "public_checks": 6,
+    "private_checks": 10,
+    "mutants": [
+      {
+        "file": "rms_vector.py",
+        "change": "/len(vector)+epsilon => +epsilon",
+        "killed_by": "No mean subtraction"
+      },
+      {
+        "file": "residual_forward.py",
+        "change": "(v if residual else 0) => v",
+        "killed_by": "No bypass"
+      },
+      {
+        "file": "residual_forward.py",
+        "change": "branch_scale*b => b",
+        "killed_by": "Pre-normalized stack"
+      },
+      {
+        "file": "depth_probe.py",
+        "change": "/(2*delta) => /delta",
+        "killed_by": "Residual depth"
+      }
+    ],
+    "reference": "passed",
+    "starter": "fails with NotImplementedError",
+    "input_immutability": "passed",
+    "experiment_runner": "passed"
+  },
+  "course-head-capacity": {
+    "public_checks": 6,
+    "private_checks": 10,
+    "mutants": [
+      {
+        "file": "low_rank_logits.py",
+        "change": "return [[sum(x*w[j] => return [[sum(-x*w[j]",
+        "killed_by": "Shared bottleneck"
+      },
+      {
+        "file": "head_metrics.py",
+        "change": "len(left)*len(right)+len(right)*len(right[0]) => len(left)*len(right[0])",
+        "killed_by": "Large logits"
+      },
+      {
+        "file": "capacity_report.py",
+        "change": "results[name]['parameters']<=budget => results[name]['parameters']<budget",
+        "killed_by": "Rank-one-only budget"
+      },
+      {
+        "file": "capacity_report.py",
+        "change": "best=min(eligible => best=max(eligible",
+        "killed_by": "The two factors determine both expressivity and storage."
+      }
+    ],
+    "reference": "passed",
+    "starter": "fails with NotImplementedError",
+    "input_immutability": "passed",
+    "experiment_runner": "passed"
+  },
+  "course-expert-capacity": {
+    "public_checks": 6,
+    "private_checks": 10,
+    "mutants": [
+      {
+        "file": "route_topk.py",
+        "change": "(-row[i],i) => (-row[i],-i)",
+        "killed_by": "Stable router"
+      },
+      {
+        "file": "capacity_dispatch.py",
+        "change": "loads[expert]<capacity => loads[expert]<=capacity",
+        "killed_by": "Partial token drops"
+      },
+      {
+        "file": "expert_layer.py",
+        "change": "a['weight']*sum => 1.0*sum",
+        "killed_by": "No mass renormalization"
+      },
+      {
+        "file": "expert_layer.py",
+        "change": "sum(dispatch['loads'])/(len(experts)*capacity) => sum(dispatch['loads'])/len(experts)",
+        "killed_by": "The last token loses both assignments when capacity is exhausted."
+      }
+    ],
+    "reference": "passed",
+    "starter": "fails with NotImplementedError",
+    "input_immutability": "passed",
+    "experiment_runner": "passed"
+  },
+  "course-generalization": {
+    "public_checks": 6,
+    "private_checks": 10,
+    "mutants": [
+      {
+        "file": "tiny_predict.py",
+        "change": "math.tanh(sum(w*x for w,x in zip(row,features))) => sum(w*x for w,x in zip(row,features))",
+        "killed_by": "Odd symmetry"
+      },
+      {
+        "file": "tiny_gradient.py",
+        "change": "(1-a*a) => 1",
+        "killed_by": "Mean batch derivative"
+      },
+      {
+        "file": "learning_curve.py",
+        "change": "if not freeze_hidden: => if True:",
+        "killed_by": "Frozen hidden family"
+      },
+      {
+        "file": "learning_curve.py",
+        "change": "dw+decay*w => dw",
+        "killed_by": "Frozen hidden family"
+      }
+    ],
+    "reference": "passed",
+    "starter": "fails with NotImplementedError",
+    "input_immutability": "passed",
+    "experiment_runner": "passed"
+  },
+  "course-reward-audit": {
+    "public_checks": 6,
+    "private_checks": 10,
+    "mutants": [
+      {
+        "file": "discounted_returns.py",
+        "change": "gamma*total => total",
+        "killed_by": "Immediate reward"
+      },
+      {
+        "file": "audit_episode.py",
+        "change": "repeat_coins or coin not in seen => True",
+        "killed_by": "One-time pickup repair"
+      },
+      {
+        "file": "audit_episode.py",
+        "change": "if success:break => if False:break",
+        "killed_by": "Stop at terminal"
+      },
+      {
+        "file": "reward_audit.py",
+        "change": "-results[n]['proxy'] => results[n]['proxy']",
+        "killed_by": "One-time pickup repair"
+      }
+    ],
+    "reference": "passed",
+    "starter": "fails with NotImplementedError",
+    "input_immutability": "passed",
+    "experiment_runner": "passed"
+  }
+}

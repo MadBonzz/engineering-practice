@@ -126,9 +126,9 @@ def run_suite(base, starter=False):
         raise ValueError(result.stderr)
 
 
-def build(p, *, systems=False):
+def build(p, *, systems=False, course=False):
     name=p["slug"]
-    prefix = "sys" if systems else "paper"
+    prefix = "course" if course else "sys" if systems else "paper"
     assert re.fullmatch(prefix + r"-[a-z0-9-]+",name) and len(p["examples"])>=2 and p["source"],name
     parts=p["parts"]
     reference={name:textwrap.dedent(source).strip()+"\n" for name,source in p["modules"].items()}
@@ -155,6 +155,9 @@ def build(p, *, systems=False):
     for i,e in enumerate(p["examples"],1):
         files[f"fixtures/example_{i}.json"]=json.dumps(e["input"],indent=2)+"\n"
     files["README.md"]=article_readme(p,stages,systems)
+    if course:
+        files.update(p["extra_files"])
+        files["README.md"] += p["extra_readme"]
     public=defaultdict(list);private=[]
     with tempfile.TemporaryDirectory() as tmp:
         base=Path(tmp)
@@ -163,7 +166,7 @@ def build(p, *, systems=False):
         for check,answer in zip(checks,expected):
             part=check["part"]
             assert 1<=part<=len(parts),(name,check)
-            if not public[part] and check["fn"]!="gateway.handle":
+            if (check.get("public", False) if course else not public[part] and check["fn"]!="gateway.handle"):
                 public[part].append((check,answer))
             else:
                 private.append(dict(part=part,title=check["title"],actions=[check["fn"],check["args"]],expected=answer))
@@ -177,11 +180,11 @@ def build(p, *, systems=False):
             subprocess.run([sys.executable,"-B","run_lab.py",f"fixtures/example_{i+1}.json"],cwd=base,capture_output=True,check=True)
         dump_files(base,files)
         run_suite(base,starter=True)
-    base=PUBLIC/("systems" if systems else "papers")/name
+    base=PUBLIC/("courses" if course else "systems" if systems else "papers")/name
     base.mkdir(parents=True,exist_ok=True)
     write_zip(base/"starter.zip",files)
     cap=CAPSTONES/model_name(p)
-    training=not systems and cap.is_dir()
+    training=not systems and not course and cap.is_dir()
     if training:
         # Package the student starter only. Reference implementations stay in authoring.
         paths=["README.md","model.py","train.py","data.py"]+[n.name for n in sorted(cap.glob("test*.py"))]
@@ -189,11 +192,16 @@ def build(p, *, systems=False):
         write_zip(base/"training.zip",{n:(cap/n).read_text() for n in paths})
     meta={k:p[k] for k in ("slug","title","group","level","duration")}
     meta.update(summary=p["mission"],parts=len(parts),editable=[*functions,"tests/test_mine.py"],training=training)
+    if course:
+        meta.update(courses=p["courses"],prerequisites=p["prerequisites"],kind="course",order=p["order"])
+        meta["editable"].append("REFLECTION.md")
     exercise={**meta,"files":files,"labels":[s["title"] for s in parts],"stageFiles":[s["file"] for s in parts],"hints":[s["hints"] for s in parts],
               "stages":stages,"modules":{"gateway.py":descriptions["gateway.py"],**descriptions},
               **{k:p[k] for k in ("mission","inputs","outputs","constraints","scope","source","examples")}}
     if p.get("localRun"):
         exercise["localRun"] = p["localRun"]
+    if course:
+        exercise["questions"] = p["questions"]
     (base/"exercise.json").write_text(compact(exercise))
     return meta,private
 

@@ -11,11 +11,16 @@
   const slug = params.get("set") || "release-comparison";
   const paper = slug.startsWith("paper-");
   const systems = slug.startsWith("sys-");
-  const structured = paper || systems;
-  const labTrack = systems ? "systems" : "papers";
+  const course = slug.startsWith("course-");
+  const structured = paper || systems || course;
+  const labTrack = course ? "courses" : systems ? "systems" : "papers";
   const libraryUrl=new URL(bench.url());
   if(structured)libraryUrl.searchParams.set("track",labTrack);
-  const catalog = await fetch(systems?"/systems-catalog.json":paper?"/paper-catalog.json":"/laboratory.json").then(r=>r.json());
+  if(params.get("from")==="courses"){
+    libraryUrl.searchParams.set("track","courses");
+    if(params.has("course"))libraryUrl.searchParams.set("course",params.get("course"));
+  }
+  const catalog = await fetch(course?"/course-new-catalog.json":systems?"/systems-catalog.json":paper?"/paper-catalog.json":"/laboratory.json").then(r=>r.json());
   if (!catalog.some(row=>row.slug===slug)) { location.replace(libraryUrl.href); return; }
   const original = slug === "release-comparison";
   const earlier = !structured && !original && params.get("edition") === "1";
@@ -23,7 +28,7 @@
   const assetBase = (structured?"/"+labTrack+"/":earlier?"/sets/":"/labs/")+slug+"/";
   const prefix = "bench.v1."+session+"."+(original ? "" : (earlier ? "" : "labs.")+slug+".");
   $("#library-link").href=libraryUrl.href;
-  if(structured)$("#library-link").setAttribute("aria-label",systems?"Back to CS systems":"Back to paper implementations");
+  if(structured)$("#library-link").setAttribute("aria-label",course?"Back to course tasks":systems?"Back to CS systems":"Back to paper implementations");
   function editionNote() {
     const box=$("#edition-note");
     const hasOld = !original && bench.localState(slug,"earlier");
@@ -59,6 +64,7 @@
   $(".intro").textContent = ex.mission || ex.intro;
   $("#starter-link").href = assetBase + "starter.zip";
   if(structured) {
+    if(course)$("#paper-sources").setAttribute("aria-label","Course assignments and references");
     if(systems)$("#paper-sources").setAttribute("aria-label","Technical references");
     if(ex.localRun){
       $("#local-service").hidden=false;
@@ -84,6 +90,17 @@
       });
       $("#paper-steps").append(action);
     });
+  }
+  if(course){
+    $("#course-context").hidden=false;
+    for(const question of ex.questions){$("#course-questions").append(make("li","",question));}
+    $("#reflection-open").onclick=()=>openFile("REFLECTION.md");
+    for(const prerequisite of ex.prerequisites){
+      const link=make("a","text-action",prerequisite.replace(/^course-|^paper-/,"").replaceAll("-"," "));
+      const u=new URL(bench.url(prerequisite));u.searchParams.set("from","courses");
+      if(params.has("course"))u.searchParams.set("course",params.get("course"));link.href=u.href;$("#course-prerequisites").append(link);
+    }
+    $("#course-prerequisites-wrap").hidden=!ex.prerequisites.length;
   }
   const local=stored.get(prefix+"draft");let files={...ex.files},etag=local?.etag||null;
   let conflict=false, pendingSync=null, dirty=!!local?.dirty, changed=0, debounce;
@@ -212,7 +229,7 @@
     const start=$("#start-here");
     start.append(document.createTextNode("Open "));
     start.append(button("gateway.py","text-action",()=>openFile("gateway.py")));
-    start.append(document.createTextNode(" to trace the caller. Implement the missing behavior in "+ex.editable.filter(p=>!p.startsWith("tests/")).join(", ")+"."));
+    start.append(document.createTextNode(" to trace the caller. Implement the missing behavior in "+ex.editable.filter(p=>p.endsWith(".py")&&!p.startsWith("tests/")).join(", ")+"."));
     for(const [index,sample] of ex.examples.entries()) renderExample(index,sample);
   }
   function pretty(value, indent=0) {
