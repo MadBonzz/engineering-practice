@@ -1,0 +1,195 @@
+[
+  {
+    "section": "Understand the system",
+    "links": [
+      {
+        "title": "ML System Design Interview Practice and Framework",
+        "url": "https://www.tensortonic.com/ml-design"
+      },
+      {
+        "title": "When to Use Machine Learning, and When Not To",
+        "url": "https://www.tensortonic.com/ml-design/when-to-use-ml"
+      },
+      {
+        "title": "Training and prediction in ML System Design",
+        "url": "https://www.tensortonic.com/ml-design/training-and-prediction"
+      }
+    ]
+  },
+  {
+    "section": "Frame the decision",
+    "links": [
+      {
+        "title": "Clarifying requirements in ML System Design",
+        "url": "https://www.tensortonic.com/ml-design/requirements"
+      },
+      {
+        "title": "From business goal to ML task",
+        "url": "https://www.tensortonic.com/ml-design/ml-objective"
+      },
+      {
+        "title": "Scale and latency estimates",
+        "url": "https://www.tensortonic.com/ml-design/scale-and-latency"
+      }
+    ]
+  },
+  {
+    "section": "Data and labels",
+    "links": [
+      {
+        "title": "Logging training examples in ML System Design",
+        "url": "https://www.tensortonic.com/ml-design/logging"
+      },
+      {
+        "title": "Labels and delayed outcomes",
+        "url": "https://www.tensortonic.com/ml-design/labels"
+      },
+      {
+        "title": "Rare events and class imbalance",
+        "url": "https://www.tensortonic.com/ml-design/sampling"
+      },
+      {
+        "title": "Data splits and leakage in ML System Design",
+        "url": "https://www.tensortonic.com/ml-design/leakage"
+      },
+      {
+        "title": "People who adapt to the model",
+        "url": "https://www.tensortonic.com/ml-design/adversaries"
+      }
+    ]
+  },
+  {
+    "section": "Features and representations",
+    "links": [
+      {
+        "title": "Choosing features in ML System Design",
+        "url": "https://www.tensortonic.com/ml-design/features"
+      },
+      {
+        "title": "Feature stores and consistency",
+        "url": "https://www.tensortonic.com/ml-design/feature-consistency"
+      },
+      {
+        "title": "Embeddings and similarity search",
+        "url": "https://www.tensortonic.com/ml-design/embeddings"
+      },
+      {
+        "title": "New users and new items in ML System Design",
+        "url": "https://www.tensortonic.com/ml-design/cold-start"
+      }
+    ]
+  },
+  {
+    "section": "Models and training",
+    "links": [
+      {
+        "title": "Building a baseline in ML System Design",
+        "url": "https://www.tensortonic.com/ml-design/baselines"
+      },
+      {
+        "title": "Choosing a model and loss in ML System Design",
+        "url": "https://www.tensortonic.com/ml-design/model-selection"
+      },
+      {
+        "title": "Reusing pretrained models in ML System Design",
+        "url": "https://www.tensortonic.com/ml-design/pretrained-models"
+      },
+      {
+        "title": "Training pipelines and versioning",
+        "url": "https://www.tensortonic.com/ml-design/training"
+      }
+    ]
+  },
+  {
+    "section": "Evaluation and experiments",
+    "links": [
+      {
+        "title": "Classification metrics and thresholds",
+        "url": "https://www.tensortonic.com/ml-design/classification-metrics"
+      },
+      {
+        "title": "Retrieval and ranking metrics",
+        "url": "https://www.tensortonic.com/ml-design/ranking-metrics"
+      },
+      {
+        "title": "Evaluating generated answers",
+        "url": "https://www.tensortonic.com/ml-design/generative-evaluation"
+      },
+      {
+        "title": "Error analysis and evaluation slices",
+        "url": "https://www.tensortonic.com/ml-design/error-analysis"
+      },
+      {
+        "title": "A/B testing and safe rollout",
+        "url": "https://www.tensortonic.com/ml-design/experiments"
+      }
+    ]
+  },
+  {
+    "section": "Serving and scale",
+    "links": [
+      {
+        "title": "Batch, online, and streaming inference",
+        "url": "https://www.tensortonic.com/ml-design/inference"
+      },
+      {
+        "title": "Retrieval and ranking pipelines",
+        "url": "https://www.tensortonic.com/ml-design/retrieval-ranking"
+      },
+      {
+        "title": "Latency, throughput, and cost",
+        "url": "https://www.tensortonic.com/ml-design/latency"
+      },
+      {
+        "title": "Fallbacks and model rollouts",
+        "url": "https://www.tensortonic.com/ml-design/fallbacks"
+      },
+      {
+        "title": "LLM serving and RAG in ML System Design",
+        "url": "https://www.tensortonic.com/ml-design/llm-serving"
+      }
+    ]
+  },
+  {
+    "section": "Monitoring and improvement",
+    "links": [
+      {
+        "title": "Monitoring and drift in ML System Design",
+        "url": "https://www.tensortonic.com/ml-design/monitoring"
+      },
+      {
+        "title": "When and how to retrain in ML System Design",
+        "url": "https://www.tensortonic.com/ml-design/retraining"
+      },
+      {
+        "title": "Feedback loops and exposure bias",
+        "url": "https://www.tensortonic.com/ml-design/feedback-loops"
+      }
+    ]
+  },
+  {
+    "section": "Interview practice",
+    "links": [
+      {
+        "title": "Approaching the ML System Design Interview",
+        "url": "https://www.tensortonic.com/ml-design/interview-approach"
+      },
+      {
+        "title": "ML System Design Interview Framework",
+        "url": "https://www.tensortonic.com/ml-design/interview-framework"
+      },
+      {
+        "title": "Walkthrough: Content Moderation System Design",
+        "url": "https://www.tensortonic.com/ml-design/interview-walkthrough-moderation"
+      },
+      {
+        "title": "Walkthrough: Video Recommendation Design",
+        "url": "https://www.tensortonic.com/ml-design/interview-walkthrough-recommendation"
+      },
+      {
+        "title": "ML System Design Interview Mistakes by Level",
+        "url": "https://www.tensortonic.com/ml-design/interview-mistakes-and-levels"
+      }
+    ]
+  }
+]

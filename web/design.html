@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Design studio · Practice Bench</title><link rel="icon" href="/bench-icon.svg"><link rel="stylesheet" href="/library.css?v=5"><link rel="stylesheet" href="/design.css?v=1">
+<script defer src="/progress.js?v=5"></script><script type="module" src="/design.js?v=1"></script></head>
+<body><header class="mast"><div class="wrap"><a class="brand" id="home" href="/?track=design"><img src="/bench-icon.svg" alt="" width="30" height="30">Practice Bench</a><span class="divider"></span><a id="back" href="/?track=design">System design library</a><span class="save" id="save" role="status">Opening workspace…</span></div></header>
+<main class="studio" id="studio" hidden><section class="problem" aria-label="Design brief">
+<div class="brief-head"><p id="meta" class="kicker"></p><h1 id="title"></h1><p id="brief"></p></div>
+<div class="requirements"><h2>Operating constraints</h2><ul id="constraints"></ul></div>
+<details open><summary>Example request and response</summary><div class="inside"><h3>Input</h3><p id="inputs"></p><pre id="sample-in"></pre><h3>Example output</h3><p id="outputs"></p><pre id="sample-out"></pre><p id="why"></p></div></details>
+<details><summary>Sources and further reading</summary><div class="inside"><h3>Engineering references</h3><ul id="sources"></ul><h3>Related lessons</h3><ul id="lessons"></ul></div></details>
+</section>
+<section class="notebook" aria-label="Design workspace">
+<nav class="navtabs" aria-label="Design workspace views"><button data-tab="notes" aria-pressed="true">Design notes</button><button data-tab="architecture">Architecture</button><button data-tab="review">Review</button></nav>
+<section class="sheet" id="notes"><h2>Your design</h2><p class="hint">Write the decisions you would defend in an interview. Use the Architecture tab to map how data moves between components.</p><div id="tasks"></div>
+<details id="incident" class="incident"><summary>Reveal the interviewer follow-up</summary><div class="inside"><h3 id="event"></h3><label for="response" id="twist-prompt"></label><textarea id="response" rows="4" maxlength="20000"></textarea></div></details></section>
+<section class="sheet" id="architecture" hidden><h2>Architecture sketch</h2><p class="hint">Name the components in your design and label the data each connection carries. The diagram updates as you edit.</p>
+<form id="connection-form"><label>From<input id="from" maxlength="48" required placeholder="e.g. Request router"></label><label>To<input id="to" maxlength="48" required placeholder="e.g. Online scorer"></label><label>Data or operation<input id="payload" maxlength="80" required placeholder="e.g. Features at request time"></label><button class="action" type="submit">Add connection</button></form>
+<div id="graph" class="graph" aria-label="Architecture diagram"></div><ul class="edge-list" id="edges"></ul><p id="graph-message" role="status"></p></section>
+<section class="sheet" id="review" hidden><h2>Review your design</h2><div class="calculation"><h3>Quantitative checkpoint</h3><p class="hint">Use the operating figures in this independent scenario.</p><p id="math-prompt"></p><form id="math-form"><label id="units" for="estimate">Your answer</label><div class="math-entry"><input type="number" step="any" id="estimate" required><button class="action" type="submit">Check answer</button></div></form><p role="status" id="math-result"></p><details><summary>Show worked calculation</summary><p id="math-worked"></p></details></div>
+<h3>Self-review</h3><p class="hint">Compare each decision with its criterion and check the ones your design addresses.</p><div id="rubric"></div>
+<details><summary>Compare with a worked design</summary><p id="walkthrough" class="inside"></p></details><div class="finish"><button class="primary" id="finish">Mark design reviewed</button><p id="finish-message" role="status"></p></div></section>
+<footer class="tools"><button class="link" id="export">Export design notes</button><button class="link" id="resume">Copy resume link</button><span id="tool-status" role="status"></span><button class="link" id="reload-cloud" hidden>Load cloud draft</button></footer></section></main>
+<div id="fatal" class="wrap" role="alert"></div></body></html>

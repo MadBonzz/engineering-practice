@@ -1,0 +1,310 @@
+{
+  "kv-cache": [
+    [
+      "keys.append(k)",
+      "keys.append(q)",
+      "Append one attention state \u00b7 advance"
+    ],
+    [
+      "len(keys), keys",
+      "0, keys",
+      "Decode across layers \u00b7 decode"
+    ],
+    [
+      "x-y]",
+      "x+y]",
+      "Decode across layers \u00b7 decode"
+    ],
+    [
+      "enumerate(cache)",
+      "enumerate(reversed(cache))",
+      "Decode across layers \u00b7 decode"
+    ]
+  ],
+  "live-batching": [
+    [
+      "remaining-1",
+      "remaining",
+      "Execute one model batch \u00b7 step"
+    ],
+    [
+      "active + waiting[:count]",
+      "waiting[:count] + active",
+      "Admit and retire requests \u00b7 tick"
+    ],
+    [
+      "remaining > 0",
+      "remaining > 1",
+      "Admit and retire requests \u00b7 tick"
+    ],
+    [
+      "new_state(prompt), budget",
+      "0, budget",
+      "Serve the arrival stream \u00b7 dispatch"
+    ]
+  ],
+  "paged-cache": [
+    [
+      "length+extra+block_size-1",
+      "length+extra",
+      "Reserve capacity atomically \u00b7 reserve"
+    ],
+    [
+      "need > len(blocks)",
+      "need >= len(blocks)",
+      "Reserve capacity atomically \u00b7 reserve"
+    ],
+    [
+      "offset%block_size",
+      "offset//block_size",
+      "Translate a token address \u00b7 locate"
+    ],
+    [
+      "sorted(free+table)",
+      "free+table",
+      "Replay allocation traffic \u00b7 replay"
+    ]
+  ],
+  "shared-prefix": [
+    [
+      "break",
+      "continue",
+      "Select a reusable snapshot \u00b7 prefix_length"
+    ],
+    [
+      "version == model and ",
+      "",
+      "Select a reusable snapshot \u00b7 choose"
+    ],
+    [
+      "values[:n]",
+      "values[:]",
+      "Select a reusable snapshot \u00b7 choose"
+    ],
+    [
+      "active.pop(args[0],None)",
+      "active.clear()",
+      "Branch and cancel requests \u00b7 run"
+    ]
+  ],
+  "speculative-decode": [
+    [
+      "result+[target[-1]]",
+      "result",
+      "Verify greedy proposals \u00b7 greedy"
+    ],
+    [
+      "p[token]/q[token]",
+      "q[token]/p[token]",
+      "Verify a sampled block \u00b7 verify"
+    ],
+    [
+      "max(0,x-y)",
+      "max(0,y-x)",
+      "Verify a sampled block \u00b7 verify"
+    ],
+    [
+      "if not ok:",
+      "if ok:",
+      "Verify a sampled block \u00b7 sample_block"
+    ]
+  ],
+  "block-attention": [
+    [
+      "/math.sqrt(len(query))",
+      "/len(query)",
+      "Accumulate stable block statistics \u00b7 scores"
+    ],
+    [
+      "mass*factor+sum(weights)",
+      "mass+sum(weights)",
+      "Accumulate stable block statistics \u00b7 absorb"
+    ],
+    [
+      "factor*x + sum",
+      "x + sum",
+      "Accumulate stable block statistics \u00b7 absorb"
+    ],
+    [
+      "x/state[1]",
+      "x",
+      "Stream an attention result \u00b7 attention"
+    ]
+  ],
+  "quantized-linear": [
+    [
+      "peak/127",
+      "peak/128",
+      "Quantize and run the layer \u00b7 quantize"
+    ],
+    [
+      "round(v/scale)",
+      "int(v/scale)",
+      "Quantize and run the layer \u00b7 quantize"
+    ],
+    [
+      "b+s*sum",
+      "s*sum",
+      "Quantize and run the layer \u00b7 project"
+    ],
+    [
+      "pack(\"<f\",scale)",
+      "pack(\">f\",scale)",
+      "Export the deployment format \u00b7 export"
+    ]
+  ],
+  "chat-sft": [
+    [
+      "role == \"assistant\"",
+      "role != \"user\"",
+      "Label a single turn \u00b7 encode_turn"
+    ],
+    [
+      "[IGNORE, *tokens, END]",
+      "[IGNORE, *tokens, IGNORE]",
+      "Label a single turn \u00b7 encode_turn"
+    ],
+    [
+      "ids[:limit], labels[:limit]",
+      "ids[:limit+1], labels[:limit+1]",
+      "Frame a conversation \u00b7 encode_chat"
+    ],
+    [
+      "labels+[IGNORE]*gap",
+      "labels+[PAD]*gap",
+      "Collate a training batch \u00b7 collate"
+    ]
+  ],
+  "lora-layer": [
+    [
+      "alpha/len(a)",
+      "alpha",
+      "Run the adapter \u00b7 forward"
+    ],
+    [
+      "v-y for v,y",
+      "y-v for v,y",
+      "Train only the adapter \u00b7 update"
+    ],
+    [
+      "v-lr*scale*e*h",
+      "v-lr*e*h",
+      "Train only the adapter \u00b7 update"
+    ],
+    [
+      "v+scale*sum",
+      "v-scale*sum",
+      "Merge for deployment \u00b7 merge"
+    ]
+  ],
+  "dpo-loss": [
+    [
+      "if m)",
+      "if not m)",
+      "Implement the preference objective \u00b7 completion"
+    ],
+    [
+      "advantage(pair[\"chosen\"])-advantage",
+      "advantage(pair[\"chosen\"])+advantage",
+      "Implement the preference objective \u00b7 margin"
+    ],
+    [
+      "beta*margin(pair)",
+      "margin(pair)",
+      "Implement the preference objective \u00b7 batch"
+    ],
+    [
+      "sigmoid_neg/len(pairs)",
+      "sigmoid_neg",
+      "Implement the preference objective \u00b7 batch"
+    ]
+  ],
+  "data-parallel": [
+    [
+      "prediction(weights,x)-y",
+      "y-prediction(weights,x)",
+      "Compute a rank report \u00b7 local"
+    ],
+    [
+      "v/max(1,len(examples))",
+      "v",
+      "Compute a rank report \u00b7 local"
+    ],
+    [
+      "sum(n*g[j]",
+      "sum(g[j]",
+      "Reduce uneven shards \u00b7 reduce_ranks"
+    ],
+    [
+      "w-lr*g",
+      "w+lr*g",
+      "Synchronize training steps \u00b7 train"
+    ]
+  ],
+  "paired-bootstrap": [
+    [
+      "sum(b-a",
+      "sum(a-b",
+      "Estimate paired improvements \u00b7 delta"
+    ],
+    [
+      "rows[i] for i in units",
+      "rows[i] for i in set(units)",
+      "Estimate paired improvements \u00b7 replicate"
+    ],
+    [
+      "for doc in units for row",
+      "for doc in set(units) for row",
+      "Estimate paired improvements \u00b7 replicate"
+    ],
+    [
+      "quantile(.975)",
+      "quantile(.75)",
+      "Construct the interval \u00b7 interval"
+    ]
+  ],
+  "judge-validation": [
+    [
+      "order[0 if",
+      "\"AB\"[0 if",
+      "Audit swapped verdicts \u00b7 audit"
+    ],
+    [
+      "return \"tie\"",
+      "return None",
+      "Audit swapped verdicts \u00b7 canonical"
+    ],
+    [
+      "valid and x == y",
+      "valid and x != y",
+      "Audit swapped verdicts \u00b7 audit"
+    ],
+    [
+      "agreed/stable if stable",
+      "agreed/valid if stable",
+      "Report agreement by slice \u00b7 summarize"
+    ]
+  ],
+  "durable-replay": [
+    [
+      "f\"{len(session)}:{session}{turn}\"",
+      "session+\":\"+turn",
+      "Resume a single tool call \u00b7 effect_key"
+    ],
+    [
+      "answer = records[0][2]",
+      "answer = answer",
+      "Recover interleaved turns \u00b7 replay"
+    ],
+    [
+      "if stop==\"tool\":",
+      "if stop==\"never\":",
+      "Resume a single tool call \u00b7 resume"
+    ],
+    [
+      "if status==\"done\":",
+      "if status==\"intent\":",
+      "Resume a single tool call \u00b7 resume"
+    ]
+  ]
+}

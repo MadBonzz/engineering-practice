@@ -1,0 +1,8 @@
+out/*
+!out/.gitkeep
+attempts/*
+!attempts/.gitkeep
+reviews/*
+!reviews/.gitkeep
+__pycache__/
+*.pyc

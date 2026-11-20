@@ -1,0 +1,39 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f6f5f0"><title>Practice Bench · Release comparison</title><link rel="icon" href="/bench-icon.svg"><link rel="stylesheet" href="/editor/codemirror.css"><link rel="stylesheet" href="/bench.css?v=6"><script defer src="/editor/codemirror.js"></script><script defer src="/editor/python.js"></script><script defer src="/editor/fflate.js"></script><script defer src="/progress.js?v=4"></script><script defer src="/bench.js?v=7"></script></head><body>
+<main class="bench-layout">
+<aside id="assessment" aria-label="Assessment">
+<header class="bench-head">
+  <a class="brand" id="library-link" href="/" aria-label="Back to problem library"><img src="/bench-icon.svg" alt="">Problem library</a>
+  <div class="head-actions"><span id="save-state" role="status">Opening draft…</span><button id="load-cloud" class="subtle" hidden>Use cloud draft</button></div>
+  <a class="mobile-jump" href="#workspace">Editor ↓</a>
+</header>
+<div class="assessment-body">
+<div id="edition-note" class="edition-note" hidden></div>
+<div class="eyeline"><span class="exercise-symbol" aria-hidden="true">⌁</span><span id="topic"></span></div><h1>Practice Bench</h1><div class="meta"><span>Python</span><i></i><span id="duration"></span><i></i><span id="part-count"></span></div><nav class="side-nav" aria-label="Assessment"><button class="active" data-pane="brief">Problem</button><button data-pane="files">Codebase</button><button data-pane="hints">Hints</button><button data-pane="feedback">Output</button></nav>
+<section id="brief" class="pane">
+<h2 class="problem-heading">Problem description</h2><p class="intro"></p>
+<section id="paper-context" hidden><h2>What you’ll implement</h2><p id="paper-scope"></p><div id="paper-sources" aria-label="Paper and model references"></div>
+<h2>Implementation steps</h2><p>Choose a step to open its module and select its public tests.</p><div id="paper-steps"></div>
+<div id="local-service" hidden><h3>Run the service locally</h3><p id="local-service-help"></p><a class="text-action" id="local-service-link" download>Download the server starter ↓</a></div>
+<div id="paper-training" hidden><strong>Local PyTorch training project</strong><p>Implement the model, run its tests, and train it on a small synthetic dataset. Setup and CPU commands are in the project README.</p><a class="text-action" id="training-link" download>Download training project ↓</a></div></section>
+<div id="problem-contract" hidden><h2>Input</h2><p id="input-contract"></p><h2>Output</h2><p id="output-contract"></p>
+<div id="worked-examples"></div>
+<h2>Constraints</h2><p id="limits"></p>
+<h2>Where to start</h2><p id="start-here"></p><button class="text-action" id="view-codebase">Explore the codebase →</button></div>
+<h2>Implementation requirements</h2><div id="parts"></div><button id="fullspec" class="text-action">Open README.md ↗</button></section>
+<section id="files" class="pane" hidden><h2>Codebase</h2><p id="files-instructions">Select a file to open it in the editor.</p><div id="filetree"></div><a class="text-action" id="starter-link" download href="/starter.zip">Download clean starter ↓</a></section>
+<section id="hints" class="pane" hidden><h2>Hint ladder</h2><p>Reveal one hint at a time for the part you’re working on.</p><label for="hint-part">Part</label><select id="hint-part"><option value="1">1 · Track updates</option><option value="2">2 · Match outcomes</option><option value="3">3 · Decide a release</option></select><div id="hint-list"></div><button class="subtle" id="next-hint">Reveal hint 1</button></section>
+<section id="feedback" class="pane results" hidden><div class="result-head"><nav aria-label="Output"><button data-output="tests" class="active">Test results</button><button data-output="log">Console</button><button data-output="review">Review</button></nav><span id="run-state" role="status">Idle</span></div><div id="output" aria-live="polite"></div></section>
+<div class="aside-bottom">
+  <button id="export" class="quiet"><span aria-hidden="true">↓</span> Export attempt</button>
+  <button id="resume" class="text-action">Copy resume link ↗</button><span id="resume-status" role="status"></span>
+</div>
+</div></aside>
+<section class="work" id="workspace" aria-label="Coding workspace">
+<div class="workspace-toolbar">
+<div class="editor-tabs" id="tabs" role="tablist" aria-label="Files"></div>
+<div class="tools"><div class="run-controls"><label for="suite" class="sr-only">Test suite</label><select id="suite"><option value="all">All public tests</option><option value="1">Part 1 only</option><option value="2">Part 2 only</option><option value="3">Part 3 only</option><option value="mine">My tests</option></select><button class="run" id="run"><span aria-hidden="true">▷</span> Run tests</button></div><button class="submit" id="submit">Submit for review <span aria-hidden="true">↗</span></button></div>
+</div>
+<div id="edit-area"><textarea id="code" aria-label="Python code editor" spellcheck="false"></textarea></div><div class="statusbar"><span id="active-path">ledger.py</span><span id="edit-mode">Editable</span><a href="#assessment" class="mobile-jump">Assessment ↑</a><span id="position">Ln 1, Col 1</span></div>
+</section></main>
+<dialog id="confirm"><form method="dialog"><h2>Submit this attempt?</h2><p>A snapshot of your current files will be graded. You can keep editing afterward and submit another version.</p><div><button value="cancel" class="subtle">Keep practicing</button><button value="submit" class="submit">Submit snapshot</button></div></form></dialog>
+<template id="initial-output"><div class="empty"><span class="terminal-sign" aria-hidden="true">›_</span><div><strong>Ready to run</strong><p>Run the public suite or choose a single part.</p></div></div></template></body></html>

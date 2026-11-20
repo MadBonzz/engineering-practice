@@ -1,0 +1,39 @@
+{
+  "slug": "release-comparison",
+  "title": "Release comparison",
+  "language": "Python",
+  "duration": "30–45 min",
+  "parts": 3,
+  "editable": [
+    "ledger.py",
+    "report.py",
+    "tests/test_mine.py"
+  ],
+  "group": "Model evaluation",
+  "intro": "Two models answer the same batch of prompts before a release. Workers can retry, correct, or withdraw a label. Complete the component that turns their updates into a rollout decision.",
+  "labels": [
+    "Track updates",
+    "Match outcomes",
+    "Decide a release"
+  ],
+  "hints": [
+    [
+      "The outcome must reflect the authoritative revision for this prompt and model.",
+      "Read the withdrawal and retry rules together. What should a later read observe?",
+      "Think about what information a boolean alone loses once another update arrives.",
+      "One approach records the current revision and its value for every independently updated identity."
+    ],
+    [
+      "Both current labels must exist, and the return order is specified.",
+      "Compare three possible outcomes: missing, incorrect, and correct.",
+      "Having a label and having a correct label answer different questions.",
+      "One approach obtains both current values, tests for absence explicitly, and returns them in contract order."
+    ],
+    [
+      "Only comparable prompts contribute to the report.",
+      "Check the threshold boundary, a draw, and what happens after a withdrawal.",
+      "Trace two reports with a label update in between.",
+      "One approach derives the counts from the current pairs when the report is requested."
+    ]
+  ]
+}

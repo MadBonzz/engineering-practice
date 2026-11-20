@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Problem library · Practice Bench</title><link rel="icon" href="/bench-icon.svg">
+<link rel="stylesheet" href="/library.css?v=6"><script defer src="/progress.js?v=5"></script><script defer src="/library.js?v=7"></script>
+</head><body>
+<header class="mast"><div class="wrap"><a class="brand" href="/"><img src="/bench-icon.svg" width="32" height="32" alt="">Practice Bench</a><span class="divider"></span><span>Problem library</span></div></header>
+<main class="wrap">
+<section class="intro"><div><h1>Problem library</h1><p id="track-intro">Engineering labs in machine learning and computer science.</p></div>
+<div class="progress-panel" aria-label="Overall progress"><div class="panel-title">Your progress <strong id="progress-count">—</strong></div><progress id="bar" value="0" max="15"></progress><div class="panel-stats"><span id="working-count">Loading progress…</span><span id="untouched-count"></span></div></div></section>
+<nav class="track-switch" aria-label="Practice tracks"><a href="/" id="coding-track">Coding labs</a><a href="/?track=design" id="design-track">ML system design</a><a href="/?track=papers" id="paper-track">Paper implementations</a><a href="/?track=systems" id="systems-track">CS systems</a></nav>
+<div class="layout"><aside aria-label="Topic filters"><h2>Topics</h2><nav id="topics"></nav><label class="retrieval-setting" id="retrieval-setting" hidden><input id="retrieval" type="checkbox"> Include retrieval cases</label><label class="retrieval-setting" id="training-filter" hidden><input type="checkbox" id="training-only"> Has PyTorch training project</label><a id="resume-last" class="resume" hidden>Resume last lab <span>↗</span></a><details id="reading-guide" hidden><summary>Study guide · 37 lessons</summary><div id="reading-list"></div></details></aside>
+<section class="listing" aria-label="Problem list"><div class="controls"><label class="search"><span aria-hidden="true">⌕</span><input type="search" id="search" aria-label="Search problems" placeholder="Search problems…"></label>
+<label class="select"><span class="sr-only">Filter by progress</span><select id="state"><option value="all">All statuses</option><option value="fresh">Not started</option><option value="started">In progress</option><option value="solved">Solved</option></select></label>
+<label class="select"><span class="sr-only">Filter by difficulty</span><select id="difficulty"><option value="all">All levels</option><option>Intermediate</option><option>Advanced</option></select></label></div>
+<p id="sync-warning" class="warning" hidden></p><div class="table-head"><span id="result-count" role="status">Loading labs…</span><span>Level</span><span>Progress</span></div><div id="problems"></div><div class="empty" id="no-results" hidden><h3>No matching problems</h3><p>Try another topic, status, or search term.</p><button id="clear">Clear filters</button></div></section></div>
+</main></body></html>
+

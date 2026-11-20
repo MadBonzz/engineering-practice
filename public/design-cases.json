@@ -1,0 +1,2361 @@
+[
+  {
+    "slug": "design-shuttle-eta",
+    "title": "Estimate when a shuttle reaches a pickup stop",
+    "topic": "Prediction",
+    "minutes": 45,
+    "level": "Intermediate",
+    "retrieval": false,
+    "brief": "A campus shuttle app shows people waiting outside two times: a typical pickup time and a later time the dispatcher can usually meet. A road router already estimates the drive. Your team owns the correction for dwell time, queues at gates, and uncertainty. Design the service from a vehicle ping to a rider-facing estimate.",
+    "inputs": "A request identifies a vehicle, its next pickup stop, the request time in UTC, the last vehicle ping, and the router's remaining drive time in seconds. Historical logs contain dispatch, GPS, and door-open events with both event and ingestion times.",
+    "outputs": "Return the median and 90th-percentile remaining seconds until doors open, a source identifying the prediction path, and the timestamp the prediction was made. A late ping still gets a response.",
+    "sampleIn": {
+      "vehicle": "v17",
+      "stop": "north-gate",
+      "as_of": "2026-10-05T08:00:00Z",
+      "last_ping": "2026-10-05T07:59:52Z",
+      "route_seconds": 300
+    },
+    "sampleOut": {
+      "p50_seconds": 360,
+      "p90_seconds": 480,
+      "source": "live",
+      "as_of": "2026-10-05T08:00:00Z"
+    },
+    "why": "Illustrative estimates add 60 and 180 seconds to the five-minute drive. The median corresponds to 08:06. Across comparable predictions, roughly nine in ten arrivals should be within the reported upper time. You may choose another calibrated model.",
+    "constraints": [
+      "Peak load is 1,200 predictions/s. End-to-end p95 must stay below 90 ms.",
+      "A live ping expires after 120 s. The fallback must work with only the current route and timetable.",
+      "Check upper-bound calibration separately for each of 12 routes and for peak hours once 200 trips are available in a slice."
+    ],
+    "tasks": [
+      {
+        "title": "Define a usable label",
+        "prompt": "Trace one prediction made at 08:00 through the subsequent door-open event. Describe joins, skipped stops, repeated pings, and when a prediction becomes evaluable.",
+        "check": "Use the first matching pickup at the right stop and trip. Keep features at or before issuance, and explain how repeated requests from one trip affect train/test splits."
+      },
+      {
+        "title": "Choose the correction",
+        "prompt": "Compare the current router with one learned alternative. Explain how you estimate both time quantiles and handle underrepresented stops.",
+        "check": "Give units for the residual or direct target, a quantile-sensitive objective or calibration step, and a rule that keeps p90 at least p50."
+      },
+      {
+        "title": "Budget the live path",
+        "prompt": "Place the vehicle state, route lookup, model, and fallback in a sketch. Assign time budgets within 90 ms and estimate outstanding requests at peak for a stated mean response time.",
+        "check": "Budget network overhead and the deadline. Distinguish a slow live feed from genuine slow traffic, and specify the output when the feed expires."
+      },
+      {
+        "title": "Decide whether to ship",
+        "prompt": "Design a time-based replay and an on-vehicle or route-level trial. Name a case in which median error improves but dispatch should reject the change.",
+        "check": "Compare against the router, check p90 coverage and interval width, and inspect route and time-of-day slices with enough observations."
+      }
+    ],
+    "twist": {
+      "event": "A bridge closure doubles pickup delays on two routes. GPS remains healthy and systemwide median error looks normal.",
+      "prompt": "Explain what alarm fires, who switches the two routes to a fallback, and how those routes qualify to return.",
+      "check": "Connect a route-specific miss signal to a temporary serving action. Account for late arrival labels before declaring recovery."
+    },
+    "sources": [
+      {
+        "title": "Uber Engineering · DeepETA",
+        "url": "https://www.uber.com/us/en/blog/deepeta-how-uber-predicts-arrival-times/"
+      }
+    ],
+    "walkthrough": "Use the door-open stream to build stop-keyed examples and the route engine as the baseline. Learn p50 and p90 residuals from pre-request traffic and dwell signals, then calibrate by route on a later week. Serve the last vehicle state from a regional cache and fall back after 120 seconds to route-and-timetable estimates with wider historically calibrated uncertainty. The wider bound costs precision but avoids overstating confidence during a feed outage.",
+    "group": "Prediction and decisions",
+    "family": "ETA",
+    "math": {
+      "family": "ETA",
+      "prompt": "At one pickup point, 75% of requests occur in dry conditions and 25% in wet conditions. The fractions arriving within 8, 10 and 12 minutes are respectively [0.80, 0.94, 1.00] on dry roads and [0.20, 0.60, 0.84] on wet roads. A display can promise only 8, 10 or 12 minutes. What is the shortest displayed time that covers at least 90% of all arrivals?",
+      "unit": "minutes",
+      "answer": 12,
+      "tolerance": 0,
+      "explanation": "Mix the arrival probabilities at each candidate time. Coverage at 8 minutes is 0.75 × 0.80 + 0.25 × 0.20 = 65%. At 10 minutes it is 85.5%, and at 12 minutes it is 96%. The first qualifying choice is 12 minutes."
+    },
+    "lessons": [
+      {
+        "title": "Clarifying requirements",
+        "url": "https://www.tensortonic.com/ml-design/requirements"
+      },
+      {
+        "title": "Scale and latency estimates",
+        "url": "https://www.tensortonic.com/ml-design/scale-and-latency"
+      },
+      {
+        "title": "Feature stores and consistency",
+        "url": "https://www.tensortonic.com/ml-design/feature-consistency"
+      },
+      {
+        "title": "Monitoring and drift",
+        "url": "https://www.tensortonic.com/ml-design/monitoring"
+      }
+    ],
+    "series": {
+      "title": "Uber ETA Prediction",
+      "url": "https://www.tensortonic.com/ml-design/eta-prediction"
+    }
+  },
+  {
+    "slug": "design-venue-pricing",
+    "title": "Price tomorrow’s unsold rehearsal rooms",
+    "topic": "Pricing",
+    "minutes": 50,
+    "level": "Advanced",
+    "retrieval": false,
+    "brief": "Independent rehearsal studios list hourly slots. Each evening, owners receive a suggested price for tomorrow’s open slots. They can accept, ignore, or override it. Design a recommendation service that improves realized revenue per available room-hour while respecting the owner’s bounds.",
+    "inputs": "The nightly job receives available room-hours, host-set price limits, valid price steps, and a snapshot of demand, exposure, and historical bookings. All prices are whole currency units in one market.",
+    "outputs": "Emit one recommended price per eligible slot, the currency, and the snapshot ID. A closed slot must be excluded. Owner approval is required before the public price changes.",
+    "sampleIn": {
+      "slot": "studio12/tue-18",
+      "open": true,
+      "currency": "USD",
+      "min": 40,
+      "max": 60,
+      "step": 10,
+      "snapshot": "mon-2200"
+    },
+    "sampleOut": {
+      "slot": "studio12/tue-18",
+      "suggested_price": 50,
+      "currency": "USD",
+      "snapshot": "mon-2200"
+    },
+    "why": "For this example, assume booking probabilities of 0.80, 0.70, and 0.50 at $40, $50, and $60. Expected gross revenues are $32, $35, and $30. At equal costs the middle price wins. The probabilities are a worked fixture for the pricing decision.",
+    "constraints": [
+      "Compute up to 2.4 million suggestions in a 2-hour window each night.",
+      "Each price must lie on its slot’s allowed grid. An owner can withdraw a slot until the moment of publication.",
+      "Run any exploratory price recommendations on at most 3% of opted-in owner-weeks during the pilot."
+    ],
+    "tasks": [
+      {
+        "title": "Define the observation unit",
+        "prompt": "Specify one training row and one evaluation unit. Show how an offered but unseen slot, an overridden suggestion, and a cancellation enter the dataset.",
+        "check": "Log the suggested and actually posted prices with exposure and availability. Define a booking horizon and a realized-revenue outcome that handles cancellations."
+      },
+      {
+        "title": "Separate forecasting and choice",
+        "prompt": "Propose a baseline and a policy that chooses among legal prices. Explain what you can learn about an unposted price in an observational log.",
+        "check": "Show the decision on the worked fixture, where prices are bounded. Identify selection bias in prices chosen by owners and what limited exploration identifies."
+      },
+      {
+        "title": "Publish a coherent batch",
+        "prompt": "Compute the minimum sustained output rate. Explain retries, publication versions, late withdrawals, and the behavior for a new studio.",
+        "check": "2.4 million in 7,200 seconds requires about 334 suggestions/s before headroom. Include an idempotent write, an availability recheck, and a cold-start price."
+      },
+      {
+        "title": "Measure a marketplace effect",
+        "prompt": "Design the pilot. State the randomization unit, numerator and denominator of the main metric, interference risk, and a stop condition.",
+        "check": "Include available owner-hours even when no booking occurs. Measure overrides and cancellations, and explain how competing studios or the same owner could contaminate groups."
+      }
+    ],
+    "twist": {
+      "event": "Studios near a festival all accept a large increase. Their revenue per booked hour rises, but more rooms remain empty.",
+      "prompt": "Identify what decides whether to roll back and how you will distinguish incremental demand from price effects.",
+      "check": "Evaluate realized revenue per available room-hour against a credible comparator and examine occupancy, cancellations, and the festival-specific exposure mix."
+    },
+    "sources": [
+      {
+        "title": "KDD · Customized Regression Model for Airbnb Dynamic Pricing",
+        "url": "https://www.kdd.org/kdd2018/accepted-papers/view/customized-regression-model-for-Airbnb-dynamic-pricing"
+      }
+    ],
+    "walkthrough": "Build one nightly snapshot of eligible room-hours and estimate the booking probability across each owner’s legal price grid, retaining the actual offer and its exposure. Initially choose the price with the highest estimated realized revenue, publish versioned suggestions, and recheck availability before the owner accepts. Cap pilot exploration at the owner-week level and log its probabilities so randomized traffic can validate price effects. Owner-level assignment reduces contamination within studios while leaving fewer independent experimental units.",
+    "group": "Prediction and decisions",
+    "family": "Pricing",
+    "math": {
+      "family": "Pricing",
+      "prompt": "For an otherwise unsold room-night, a $120 offer books with probability 0.75. Servicing a booked night costs $45 at either price, and an unbooked night has zero contribution. At a $165 offer, what minimum booking probability preserves expected contribution per available night? Enter a percentage to two decimal places.",
+      "unit": "%",
+      "answer": 46.875,
+      "tolerance": 0.0051,
+      "explanation": "The current expected contribution is (120 − 45) × 0.75 = $56.25. The new offer earns $120 if booked, so it breaks even at 56.25 / 120 = 0.46875, or 46.875%."
+    },
+    "lessons": [
+      {
+        "title": "When to Use Machine Learning, and When Not To",
+        "url": "https://www.tensortonic.com/ml-design/when-to-use-ml"
+      },
+      {
+        "title": "From business goal to ML task",
+        "url": "https://www.tensortonic.com/ml-design/ml-objective"
+      },
+      {
+        "title": "People who adapt to the model",
+        "url": "https://www.tensortonic.com/ml-design/adversaries"
+      },
+      {
+        "title": "A/B testing and safe rollout",
+        "url": "https://www.tensortonic.com/ml-design/experiments"
+      }
+    ],
+    "series": {
+      "title": "Airbnb Smart Pricing",
+      "url": "https://www.tensortonic.com/ml-design/dynamic-pricing"
+    }
+  },
+  {
+    "slug": "design-wallet-risk",
+    "title": "Decide whether to release a wallet transfer",
+    "topic": "Risk decisions",
+    "minutes": 50,
+    "level": "Advanced",
+    "retrieval": false,
+    "brief": "A ticket marketplace lets sellers move earnings into their wallets. An account takeover can redirect a transfer. A legitimate seller needs to receive their money promptly. Design a risk service that can release, challenge, or temporarily hold a transfer, including when a dependency times out.",
+    "inputs": "An authorization request carries a stable transfer ID, amount in cents, account age, recent payout-destination changes, device history, and request time. Disputes and confirmed recoveries arrive separately.",
+    "outputs": "Return the transfer ID, exactly one action, and the policy version. A duplicate ID must recover the original recorded action even after a policy update. A challenge requires the seller to verify ownership.",
+    "sampleIn": {
+      "transfer_id": "tr-19",
+      "cents": 80000,
+      "account_days": 140,
+      "new_destination_minutes": 4,
+      "recognized_device": false
+    },
+    "sampleOut": {
+      "transfer_id": "tr-19",
+      "action": "challenge",
+      "policy_version": "pilot-2"
+    },
+    "why": "In the example policy, a newly changed destination and an unfamiliar device together require a challenge on amounts above 50,000 cents. The response demonstrates that rule. Your design must also decide how learned risk, challenge friction, and limited review capacity interact.",
+    "constraints": [
+      "Serve 350 requests/s at peak with a 75 ms p99 decision deadline.",
+      "Final fraud labels can take 35 days. The pilot review team can investigate 180 holds per day.",
+      "For 24 hours, retrying a transfer ID must preserve its first action."
+    ],
+    "tasks": [
+      {
+        "title": "Construct labels you can trust",
+        "prompt": "Sketch how dispute, recovery, and transfer events join. Say how a recently released transfer, a blocked transfer, and an unchallenged transfer appear in training.",
+        "check": "Define a maturity window and separate unknown outcomes from clean transactions. Action-dependent labels need an audit or other bounded evaluation design."
+      },
+      {
+        "title": "Spend the review budget",
+        "prompt": "Give a rule-based baseline and a cost-sensitive decision policy for three actions. Carry at least one calculation from calibrated risk into an action.",
+        "check": "Compare fraud exposure with delay and challenge costs. A count limit applies to holds across the day, including bursts. Name the policy when capacity is exhausted."
+      },
+      {
+        "title": "Design the authorization path",
+        "prompt": "Show feature timestamps, decision persistence, and retries. Divide the 75 ms budget and give a concrete fallback when the device store stalls.",
+        "check": "Recover the prior decision on duplicate delivery. Define which limited inputs are available locally, which actions they allow, and how fallback rates are monitored."
+      },
+      {
+        "title": "Audit a launch",
+        "prompt": "Design an online pilot with leading and matured metrics. How do you decide whether a fall in disputes is worth an increase in challenges?",
+        "check": "Use opportunity-based denominators, review false positives by seller cohort, retain the old policy version, and separate dispute maturity from immediate challenge outcomes."
+      }
+    ],
+    "twist": {
+      "event": "Attackers switch to low-value transfers across many sellers. Dollar loss shifts slowly, but manual reviews saturate before noon.",
+      "prompt": "Change detection and routing without treating every new seller as fraudulent. Explain how you would test the incident policy.",
+      "check": "Look for coordinated velocity or shared destinations using past-only features. Bound the review queue and measure legitimate payout delay before rollout."
+    },
+    "sources": [
+      {
+        "title": "Stripe · Machine learning for fraud protection",
+        "url": "https://stripe.com/guides/primer-on-machine-learning-for-fraud-protection"
+      },
+      {
+        "title": "Stripe · Responding to a wave of card testing",
+        "url": "https://stripe.com/newsroom/news/card-testing-surge"
+      }
+    ],
+    "walkthrough": "Join mature disputes to prior decisions, calibrate a risk model on a later unsampled cohort, and keep unsettled or blocked outcomes explicitly separate. Score using local feature snapshots, then combine calibrated expected loss with a challenge rule and a daily limit on holds. Persist each transfer’s action before replying and reuse it on retries, with bounded rules available on timeout. Challenging an uncertain transfer limits losses while imposing measurable friction on a legitimate seller.",
+    "group": "Risk and trust",
+    "family": "Fraud",
+    "math": {
+      "family": "Fraud",
+      "prompt": "A fully matured evaluation cohort contains 100,000 transactions, of which 400 proved fraudulent. A review rule flags 75% of frauds and 1.5% of legitimate transactions. What percentage of the resulting review queue is actually fraudulent? Round to two decimal places.",
+      "unit": "%",
+      "answer": 16.722408026755854,
+      "tolerance": 0.0051,
+      "explanation": "The rule flags 300 frauds and 99,600 × 0.015 = 1,494 legitimate transactions. Precision in the queue is 100 × 300 / (300 + 1,494) ≈ 16.72%."
+    },
+    "lessons": [
+      {
+        "title": "Logging training examples",
+        "url": "https://www.tensortonic.com/ml-design/logging"
+      },
+      {
+        "title": "Labels and delayed outcomes",
+        "url": "https://www.tensortonic.com/ml-design/labels"
+      },
+      {
+        "title": "Rare events and class imbalance",
+        "url": "https://www.tensortonic.com/ml-design/sampling"
+      },
+      {
+        "title": "Classification metrics and thresholds",
+        "url": "https://www.tensortonic.com/ml-design/classification-metrics"
+      }
+    ],
+    "series": {
+      "title": "Stripe Real-Time Fraud Detection",
+      "url": "https://www.tensortonic.com/ml-design/fraud-detection"
+    }
+  },
+  {
+    "slug": "design-neighborhood-trends",
+    "title": "Find emerging topics on a neighborhood board",
+    "topic": "Streaming",
+    "minutes": 45,
+    "level": "Advanced",
+    "retrieval": false,
+    "brief": "A local discussion app publishes a city board of conversations suddenly gaining independent contributors. A daily sports thread is large every evening. A bridge reopening can start with much less volume. Design the stream processor that decides which topics to publish, merge, expire, or withhold.",
+    "inputs": "The stream includes post ID, event time, ingestion time, region, author, text, and a separate delete event. Periodic board requests name a region and cutoff. Posts can be duplicated or delivered out of order.",
+    "outputs": "Publish a versioned board with at most ten topics, each with a canonical label and a count of distinct eligible authors over the last ten event-time minutes. A board can be empty.",
+    "sampleIn": {
+      "region": "north",
+      "cutoff": "18:10Z",
+      "fixture": [
+        {
+          "topic": "bridge-open",
+          "unique_10m": 60,
+          "usual_10m": 3
+        },
+        {
+          "topic": "evening-chat",
+          "unique_10m": 200,
+          "usual_10m": 190
+        }
+      ]
+    },
+    "sampleOut": {
+      "region": "north",
+      "as_of": "18:10Z",
+      "topics": [
+        {
+          "label": "bridge-open",
+          "authors_10m": 60
+        }
+      ]
+    },
+    "why": "The compact fixture stands in for the event stream. Under an illustrative gate of at least 25 contributors and a fourfold rise over the usual count, bridge-open qualifies and evening-chat does not. Designing a robust gate when the usual count is close to zero is part of the exercise.",
+    "constraints": [
+      "The stream peaks at 18,000 events/s and serves boards for 90 regions.",
+      "Publish every 60 s. Recompute affected windows when events arrive up to 3 minutes late.",
+      "A delete received by the processor must stop contributing to newly published boards within 2 minutes."
+    ],
+    "tasks": [
+      {
+        "title": "Define emergence",
+        "prompt": "Write a score or rule and apply it to both fixture rows. Explain how a brand-new topic, a tiny region, and two spellings of one event behave.",
+        "check": "Separate unusual growth from raw popularity. Give a low-support policy and a merge rule with a false-merge example."
+      },
+      {
+        "title": "Build the streaming state",
+        "prompt": "Specify partition keys, deduplication state, event-time windows, and how board versions are rebuilt after a worker crash.",
+        "check": "Bound state by retention or watermark. Show what a duplicate, late post and delete do to a distinct-author count, including someone posting twice."
+      },
+      {
+        "title": "Test manipulation and quality",
+        "prompt": "Propose a baseline and a replay that compares two trend detectors. Include one coordinated campaign and one grassroots surge.",
+        "check": "Define discovery delay and false trends using independently reviewed episodes. Distinguish number of distinct accounts from independence and evaluate smaller regions."
+      },
+      {
+        "title": "Make publication reliable",
+        "prompt": "Budget the peak event load and the per-minute materialization. Give the on-call operator a way to withdraw a mistaken topic and explain what readers see during a backlog.",
+        "check": "Specify stale-board labeling or expiry, override precedence and auditability. Include a freshness monitor independent of model score."
+      }
+    ],
+    "twist": {
+      "event": "A concert is cancelled. Thousands of real users paste the same evacuation notice, while an unrelated promotion arrives from a coordinated account network.",
+      "prompt": "Indicate which evidence can distinguish them and where uncertain topics go while you collect more evidence.",
+      "check": "Avoid using identical text as the only suppression criterion. Discuss timing, source diversity, review latency, and the cost of delaying a real event."
+    },
+    "sources": [
+      {
+        "title": "X · Trends recommendations and system overview",
+        "url": "https://help.x.com/en/resources/recommender-systems/trends-recommendations"
+      }
+    ],
+    "walkthrough": "Deduplicate post IDs and write per-author topic contributions into region-sharded event-time windows and retain enough reverse mapping to retract a deleted post and preserve an author who still has other live posts. Compare current support with a smoothed local time-of-week baseline, merge credible aliases, and publish a version every minute. A small manual hold queue protects against coordinated bursts but lengthens discovery time for real events, so measure both review delay and missed local stories.",
+    "group": "Signals and discovery",
+    "family": "Trends",
+    "math": {
+      "family": "Trends",
+      "prompt": "After deduplication, 240 of 120,000 regional authors mentioned a topic in a reference hour. In an event hour, 480 of 400,000 regional authors did. Compute the relative percentage change in the share of authors mentioning the topic. Use a negative number for a decline.",
+      "unit": "%",
+      "answer": -40,
+      "tolerance": 0.001,
+      "explanation": "The mention share moves from 0.20% to 0.12%. The relative change is 100 × (0.12 / 0.20 − 1) = −40%, even though the mention count doubled."
+    },
+    "lessons": [
+      {
+        "title": "Rare events and class imbalance",
+        "url": "https://www.tensortonic.com/ml-design/sampling"
+      },
+      {
+        "title": "People who adapt to the model",
+        "url": "https://www.tensortonic.com/ml-design/adversaries"
+      },
+      {
+        "title": "Batch, online, and streaming inference",
+        "url": "https://www.tensortonic.com/ml-design/inference"
+      },
+      {
+        "title": "Monitoring and drift",
+        "url": "https://www.tensortonic.com/ml-design/monitoring"
+      }
+    ],
+    "series": {
+      "title": "X Trending Topics Detection",
+      "url": "https://www.tensortonic.com/ml-design/spam-bot-detection"
+    }
+  },
+  {
+    "slug": "design-team-mail",
+    "title": "Route suspicious mail in a shared support inbox",
+    "topic": "Classification",
+    "minutes": 40,
+    "level": "Intermediate",
+    "retrieval": false,
+    "brief": "A support platform receives messages for thousands of small businesses. A fraudulent invoice in the inbox wastes staff time, but quarantining a real customer refund request can break a service commitment. Design a multilingual mail router that supports recovery from a false quarantine.",
+    "inputs": "The mail gateway provides a message ID, tenant, sender authentication results, subject and body, attachment metadata, and arrival time. A later action may report junk or restore an incorrectly quarantined message.",
+    "outputs": "Return one route, inbox or quarantine, and a policy version. Staff can restore a quarantined message. The service must return a decision when large attachments or slow model calls exceed its deadline.",
+    "sampleIn": {
+      "id": "m44",
+      "tenant": "brush-shop",
+      "auth": "fail",
+      "subject": "Updated payout account",
+      "body": "Pay our replacement account today",
+      "attachment_type": "executable"
+    },
+    "sampleOut": {
+      "id": "m44",
+      "route": "quarantine",
+      "policy": "mail-6"
+    },
+    "why": "In this worked tenant policy, unauthenticated mail carrying an executable is quarantined immediately. The text alone does not settle the label. Your learned stage must handle messages for which this policy has no decisive rule.",
+    "constraints": [
+      "Handle 9 million messages per day and a peak of 900 messages/s.",
+      "The p99 deadline is 180 ms per message. At most 15% of peak traffic can enter the expensive model stage.",
+      "Retain raw bodies for at most 48 hours. Evaluate false quarantines separately for any language with at least 500 audited legitimate messages."
+    ],
+    "tasks": [
+      {
+        "title": "Trace a message",
+        "prompt": "Draw the cheap and expensive paths, explain where sender signals and text meet, and state fallback decisions when each dependency is slow.",
+        "check": "Enforce the expensive-stage cap of 135 messages/s at peak. Describe an uncertain case and preserve tenant boundaries."
+      },
+      {
+        "title": "Build supervision",
+        "prompt": "Describe how to combine user reports, restores, and independent audits. Specify a split that would reveal failure on a new campaign.",
+        "check": "Account for selective reporting and which folder exposed the message. Partition near-duplicates by campaign and time, and retain only permitted derived data after expiry."
+      },
+      {
+        "title": "Choose launch criteria",
+        "prompt": "Propose a rule baseline and a learned challenger. Set a decision threshold and defend a launch using one metric for missed junk and one for legitimate messages.",
+        "check": "Use audited denominators and report uncertainty for smaller language slices. Trace how restoration corrects the mailbox and the monitoring record."
+      }
+    ],
+    "twist": {
+      "event": "One language sees a surge in restored messages after launch. Many valid words contain characters that a new normalization step strips.",
+      "prompt": "Isolate the faulty stage and propose a fix and rollback that respect the retention limit.",
+      "check": "Use paired transformations and recent consented or audited examples, compare by script, roll back the transformation version, and re-evaluate adversarial variants."
+    },
+    "sources": [
+      {
+        "title": "Google Security · Improving text classification with RETVec",
+        "url": "https://security.googleblog.com/2023/11/improving-text-classification.html"
+      }
+    ],
+    "walkthrough": "Route mail through cheap authentication, attachment and reputation checks first, then send only uncertain messages through the multilingual text model within the 135/s peak cap. Choose thresholds from audited examples stratified by language, and log limited decision metadata plus restores after bodies expire. Under overload use a validated fast classifier with tenant-specific rules, retaining a recoverable quarantine for high-risk mail. Reserving expensive capacity for ambiguity can sacrifice recall for junk that the cheap stage misclassifies confidently.",
+    "group": "Risk and trust",
+    "family": "Spam",
+    "math": {
+      "family": "Spam",
+      "prompt": "A calibrated classifier trained on a 50%-spam sample gives a message spam probability 0.80. In the deployment population only 2% of messages are spam. Assume sampling changed only the class prior, so the class-conditional feature distributions match. What corrected spam probability should this message receive? Enter a percentage to two decimal places.",
+      "unit": "%",
+      "answer": 7.547169811320755,
+      "tolerance": 0.0051,
+      "explanation": "Training prior odds are 1 and the message's training posterior odds are 4. Multiply its evidence likelihood ratio of 4 by deployment prior odds 2/98 = 1/49. The posterior probability is 4/(49 + 4) = 4/53 ≈ 7.55%."
+    },
+    "lessons": [
+      {
+        "title": "Data splits and leakage",
+        "url": "https://www.tensortonic.com/ml-design/leakage"
+      },
+      {
+        "title": "Classification metrics and thresholds",
+        "url": "https://www.tensortonic.com/ml-design/classification-metrics"
+      },
+      {
+        "title": "Error analysis and evaluation slices",
+        "url": "https://www.tensortonic.com/ml-design/error-analysis"
+      },
+      {
+        "title": "When and how to retrain",
+        "url": "https://www.tensortonic.com/ml-design/retraining"
+      }
+    ],
+    "series": {
+      "title": "Gmail Spam Filter",
+      "url": "https://www.tensortonic.com/ml-design/spam-filter"
+    }
+  },
+  {
+    "slug": "design-vintage-photo-search",
+    "title": "Find visually similar furniture from a photo crop",
+    "topic": "Visual search",
+    "minutes": 50,
+    "level": "Advanced",
+    "retrieval": true,
+    "brief": "A vintage furniture marketplace sells one-of-a-kind items. A shopper crops a chair from a room photo and wants available pieces with a similar silhouette. The identical chair usually does not exist. Design photo search so newly listed stock is discoverable and sold items disappear quickly.",
+    "inputs": "The app sends an image reference, a normalized crop [left, top, right, bottom], market, and requested result count. The catalog streams new photos, seller edits, and sale or removal records.",
+    "outputs": "Return up to k distinct eligible listing IDs ordered by visual similarity to the crop. Return fewer when necessary. The market filter and current inventory eligibility are mandatory.",
+    "sampleIn": {
+      "photo": "room44.jpg",
+      "crop": [
+        0.11,
+        0.32,
+        0.46,
+        0.91
+      ],
+      "market": "east",
+      "k": 2
+    },
+    "sampleOut": {
+      "items": [
+        "oak-7",
+        "cane-3"
+      ]
+    },
+    "why": "In the worked inventory, a sold chair is the closest visual match. Of the eligible east-market listings, oak-7 and cane-3 are the next closest. The result order illustrates that filtered contract. Actual rankings depend on learned similarity.",
+    "constraints": [
+      "The catalog contains 8 million listings with an average of 3 photos each. New listings should appear within 15 minutes.",
+      "Return p95 results in 220 ms at 240 queries/s peak.",
+      "A sold or withdrawn listing must leave the response within 20 seconds of the inventory event, including cached responses."
+    ],
+    "tasks": [
+      {
+        "title": "Define visual relevance",
+        "prompt": "Give a positive and a hard negative for a cropped chair. Choose training signals, an initial baseline, and a split for testing unseen inventory.",
+        "check": "Separate visually similar items from interchangeable or frequently clicked items. Keep photos of one listing together and compare model choices against human judgments."
+      },
+      {
+        "title": "Size the index and query",
+        "prompt": "Estimate vector storage for one 256-dimensional float16 vector per catalog photo before index overhead. Allocate time across crop encoding, approximate search, filtering, and reranking.",
+        "check": "24 million vectors × 256 × 2 bytes is 12.288 GB in decimal units before IDs, replicas or index overhead. Explain how multiple photos become one result and what happens when filters eliminate top neighbors."
+      },
+      {
+        "title": "Handle change and evaluate",
+        "prompt": "Describe new-item ingestion, sale events, and a compatible encoder/index rollout. Distinguish approximation errors from relevance errors.",
+        "check": "Use an exact-search reference for ANN recall and independent graded judgments for relevance. Check the final stock and market eligibility after cache hits. Give a safe model/index rollback."
+      }
+    ],
+    "twist": {
+      "event": "A new encoder improves judged quality in the lab. During rollout, new photos encode with the new model while half the query fleet still uses old vectors.",
+      "prompt": "Describe a rollout plan and a test that catches an incompatible query/index pair before users see empty or poor results.",
+      "check": "Version query and index embeddings together and demonstrate a reversible cutover while ingesting new sales and listings on both paths."
+    },
+    "sources": [
+      {
+        "title": "Pinterest researchers · Visual Discovery at Pinterest",
+        "url": "https://arxiv.org/abs/1702.04680"
+      }
+    ],
+    "walkthrough": "Encode the shopper’s crop online and retrieve an oversampled shortlist from a market-scoped ANN index built from listing photos. Rerank and deduplicate by listing, then recheck availability against a fast sale-event view and keep a separate incremental index for new stock. Roll out the query encoder and matching index together, validate against exact search, and compare relevance with expert judgments. Oversampling improves fill after stock filtering but consumes some of the 220 ms budget.",
+    "group": "Search and generation",
+    "family": "Visual search",
+    "math": {
+      "family": "Visual search",
+      "prompt": "Each of two independent replicas holds all 8,388,608 image vectors. Each vector takes 192 bytes plus 32 neighbor IDs at 4 bytes each. Ignore all other structures. At most 80% of installed RAM may be occupied by this index. What is the minimum combined installed RAM across both replicas? Use 1 GiB = 2³⁰ bytes.",
+      "unit": "GiB",
+      "answer": 6.25,
+      "tolerance": 0.001,
+      "explanation": "Each vector costs 192 + 32 × 4 = 320 bytes. The two replicas occupy 2 × 2²³ × 320 / 2³⁰ = 5 GiB. Installed RAM must total at least 5 / 0.80 = 6.25 GiB."
+    },
+    "lessons": [
+      {
+        "title": "Embeddings and similarity search",
+        "url": "https://www.tensortonic.com/ml-design/embeddings"
+      },
+      {
+        "title": "Retrieval and ranking metrics",
+        "url": "https://www.tensortonic.com/ml-design/ranking-metrics"
+      },
+      {
+        "title": "Retrieval and ranking pipelines",
+        "url": "https://www.tensortonic.com/ml-design/retrieval-ranking"
+      },
+      {
+        "title": "Latency, throughput, and cost",
+        "url": "https://www.tensortonic.com/ml-design/latency"
+      }
+    ],
+    "series": {
+      "title": "Pinterest Visual Search",
+      "url": "https://www.tensortonic.com/ml-design/visual-search"
+    }
+  },
+  {
+    "slug": "design-catalog-photo-tags",
+    "title": "Suggest product tags in a seller’s outfit photo",
+    "topic": "Computer vision",
+    "minutes": 45,
+    "level": "Intermediate",
+    "retrieval": false,
+    "brief": "A clothing seller uploads a photo and selects up to twelve products from the collection shown at a shoot. An editor wants clickable product tags placed on the visible items. The shortlist can omit a visible item or include several nearly identical variants. Design a system that asks the editor when evidence is weak.",
+    "inputs": "The upload supplies image width and height, an image reference, and the seller’s shortlist of product IDs. The catalog provides reference photos, variant attributes, and current publication status for those IDs.",
+    "outputs": "Return candidate tags as normalized [left, top, right, bottom] boxes with shortlisted product IDs or an unresolved state. A suggestion becomes public only after editor approval. No tag may refer to an ineligible product.",
+    "sampleIn": {
+      "image": "look-8.jpg",
+      "size_px": [
+        1000,
+        800
+      ],
+      "shortlist": [
+        "coat-sand",
+        "bag-red",
+        "bag-rust"
+      ]
+    },
+    "sampleOut": {
+      "regions": [
+        {
+          "box": [
+            0.1,
+            0.12,
+            0.63,
+            0.91
+          ],
+          "sku": "coat-sand",
+          "status": "suggested"
+        },
+        {
+          "box": [
+            0.69,
+            0.5,
+            0.92,
+            0.78
+          ],
+          "sku": null,
+          "status": "needs_editor"
+        }
+      ]
+    },
+    "why": "In this illustrative photo the coat matches its reference. The partly occluded bag fits both bag colors and remains unresolved. The first box covers image pixels x=100–630 and y=96–728. The editor sees suggestions for approval.",
+    "constraints": [
+      "Each upload contains up to 8 visible products and a shortlist of at most 12 SKUs.",
+      "Make suggestions available within 2 seconds at p95, with 55 uploads/s peak.",
+      "Auto-suggested SKU matches must reach 98% precision on audited first uploads. An editor can remove an item from publication at any time."
+    ],
+    "tasks": [
+      {
+        "title": "Define the annotations",
+        "prompt": "Design the training and audit examples. Distinguish a visible item missing from the shortlist, a wrong variant, and a poorly localized right item.",
+        "check": "Retain localization, exact identity, and unknown labels separately. Keep photos of the same shoot together when splitting the data, and sample hard color or size variants."
+      },
+      {
+        "title": "Design the photo-to-editor path",
+        "prompt": "Place detection, region-to-shortlist scoring, abstention, and editor approval in a pipeline. Calculate the worst-case count of region/SKU pairs per upload and per second.",
+        "check": "At most 96 region/SKU comparisons per upload or 5,280/s at peak before batching. Reuse catalog representations and recheck publication eligibility when a tag is approved."
+      },
+      {
+        "title": "Evaluate the actual task",
+        "prompt": "Propose metrics for localization, exact product assignment, and editor effort. Explain how to tune abstention under the precision requirement.",
+        "check": "Report precision and coverage together, including uncertain and out-of-shortlist items. Validate a box criterion, variant-specific errors, editing time, and the end-to-end reviewed tag."
+      }
+    ],
+    "twist": {
+      "event": "A seller submits a shoot where two jackets differ only in an interior label, which is invisible. Editors repeatedly correct confident suggestions.",
+      "prompt": "Decide what the UI and the model should return. Explain how repeated corrections become useful evidence without poisoning other sellers’ tags.",
+      "check": "Identify unobservable attributes, abstain or ask for evidence, and measure calibration on these near-identical variants separately from detection quality."
+    },
+    "sources": [
+      {
+        "title": "Meta researchers · GrokNet product recognition for commerce",
+        "url": "https://ai.meta.com/research/publications/groknet-unified-computer-vision-model-trunk-and-embeddings-for-commerce/"
+      }
+    ],
+    "walkthrough": "Precompute SKU reference embeddings, detect regions in the upload, and score each region against the seller’s eligible shortlist. Use held-out shoot-level audits to set a confidence and top-two margin threshold that leaves uncertain regions visible for the editor to resolve. Revalidate stock and the shortlist at approval, logging corrections separately for localization and identity. Tight thresholds can meet 98% precision while reducing coverage and increasing editing time.",
+    "group": "Perception",
+    "family": "Product tagging",
+    "math": {
+      "family": "Product tagging",
+      "prompt": "A labeled set contains 10,000 eligible product appearances, with one true SKU per appearance. The detector finds 84% of them. Among detections, the correct SKU reaches the shortlist 90% of the time. Among shortlists that contain it, the final tagger emits the correct SKU 80% of the time. What percentage of all eligible appearances gets a correct tag?",
+      "unit": "%",
+      "answer": 60.48,
+      "tolerance": 0.0051,
+      "explanation": "Of 10,000 appearances, 8,400 are detected, 7,560 retain the correct SKU, and 6,048 receive it as a tag. The rates are conditional on the preceding stages, so end-to-end recall is 60.48%."
+    },
+    "lessons": [
+      {
+        "title": "Choosing features",
+        "url": "https://www.tensortonic.com/ml-design/features"
+      },
+      {
+        "title": "Reusing pretrained models",
+        "url": "https://www.tensortonic.com/ml-design/pretrained-models"
+      },
+      {
+        "title": "Classification metrics and thresholds",
+        "url": "https://www.tensortonic.com/ml-design/classification-metrics"
+      },
+      {
+        "title": "Error analysis and evaluation slices",
+        "url": "https://www.tensortonic.com/ml-design/error-analysis"
+      }
+    ],
+    "series": {
+      "title": "Instagram Visual Product Tagging",
+      "url": "https://www.tensortonic.com/ml-design/product-search-ranking"
+    }
+  },
+  {
+    "slug": "design-peer-introductions",
+    "title": "Suggest introductions on a professional network",
+    "topic": "Social recommendations",
+    "minutes": 45,
+    "level": "Intermediate",
+    "retrieval": false,
+    "brief": "A professional association wants a weekly list of peers a member could reasonably approach. A graph service already supplies potential introductions. Your team owns the ranking model and the final decision about who can appear. Someone who opted out this morning must disappear even if last night's shortlist still contains them.",
+    "inputs": "The serving request supplies viewer, limit, a precomputed list with versioned model scores, and current exclusions. Exclusions combine existing connections, a pending invitation in either direction, a block in either direction, and discovery opt-outs. Larger scores rank first. Ties use ascending member ID.",
+    "outputs": "Return up to limit eligible member IDs in order. Returning fewer is valid. Keep the identities of mutual contacts private.",
+    "sampleIn": {
+      "viewer": "nia",
+      "limit": 3,
+      "shortlist": [
+        {
+          "id": "mei",
+          "score": 0.74
+        },
+        {
+          "id": "leo",
+          "score": 0.92
+        },
+        {
+          "id": "aya",
+          "score": 0.74
+        },
+        {
+          "id": "sam",
+          "score": 0.84
+        }
+      ],
+      "exclusions": {
+        "blocked": [
+          "leo"
+        ],
+        "already_connected": [],
+        "pending": [
+          "sam"
+        ],
+        "opted_out": []
+      }
+    },
+    "sampleOut": {
+      "member_ids": [
+        "aya",
+        "mei"
+      ]
+    },
+    "why": "Leo and Sam are ineligible. Aya and Mei tie, so the ID rule places Aya first. The system returns two introductions even though three were requested.",
+    "constraints": [
+      "A nightly job supplies at most 400 scored candidates per active viewer across 6 million active viewers.",
+      "Serving must handle 900 requests/s at peak with a 90 ms p99 deadline.",
+      "New blocks or opt-outs must take effect within 2 s. A shortlist can be up to 24 hours old."
+    ],
+    "tasks": [
+      {
+        "title": "Define a successful introduction",
+        "prompt": "Specify the exposure event and training label for an introduction that leads to a reciprocated connection. Decide what to do with unshown candidates, outstanding invitations, and candidates who were already connected when a label matured.",
+        "check": "Identify the unit (viewer, candidate, exposure time), a fixed attribution horizon and a chronological evaluation split. Explain why an unseen pair supplies no observed rejection."
+      },
+      {
+        "title": "Rank a changing social graph",
+        "prompt": "Trace a daily score build from time-stamped graph features through publication of a versioned shortlist. Give a baseline and one change for new members with few edges. Estimate how many scored rows a full refresh might produce.",
+        "check": "Use the 2.4 billion-row upper bound or justify a smaller active subset. Keep features as of scoring time and evaluate recommendations separately for new and highly connected members."
+      },
+      {
+        "title": "Enforce revocations at delivery",
+        "prompt": "Draw the request path and show where a block created after the batch is checked. Specify what the endpoint returns if its policy dependency cannot establish eligibility.",
+        "check": "State the staleness bound for eligibility, include both directions of a block, and give a fallback consistent with that bound. A ranker cache keyed only by the viewer cannot enforce it."
+      },
+      {
+        "title": "Test whether the network improved",
+        "prompt": "Propose a launch metric and an experiment that can distinguish accepted introductions from extra invitation spam. Explain what happens when a suggested member receives invitations from both experiment arms.",
+        "check": "Include a recipient-facing guardrail and describe interference, for example through cluster assignment or measurement of exposure on both sides."
+      }
+    ],
+    "twist": {
+      "event": "A celebrity joins the network. Invite sends rise 40% and accepts per exposed viewer stay flat, while a small recipient cohort reports a flood of invitations.",
+      "prompt": "Choose an immediate product control and an analysis that can tell whether the recommender is concentrating attention.",
+      "check": "Inspect incoming invitations per recipient and exposure concentration. Place the control before delivery and consider its impact on less-connected new members."
+    },
+    "sources": [
+      {
+        "title": "LinkedIn Engineering · Building a Large-Scale Recommendation System: People You May Know",
+        "url": "https://www.linkedin.com/blog/engineering/recommendations/building-a-large-scale-recommendation-system-people-you-may-know"
+      }
+    ],
+    "walkthrough": "Build a nightly exposure-time feature table from the supplied graph shortlist and train a baseline on invitations that mature into reciprocal connections within a fixed window. At read time, take the ranked IDs through a current bidirectional policy check and drop any whose status cannot be verified by the deadline. This gives highly consistent revocations at the cost of an occasional shorter list. Check acceptance per exposure and incoming invitation concentration together.",
+    "group": "Recommendations",
+    "family": "People recommendations",
+    "math": {
+      "family": "People recommendations",
+      "prompt": "An exposure experiment has 1,000 eligible person-pairs. It shows returning-user pairs with probability 0.5 and newcomer pairs with probability 0.125, independently of their potential acceptance. Among shown pairs, 32 returning-user and 4 newcomer invitations are accepted. Assuming one invitation per pair and no interference, use inverse-probability weighting to estimate the acceptance percentage if all 1,000 pairs were shown.",
+      "unit": "%",
+      "answer": 9.6,
+      "tolerance": 0.001,
+      "explanation": "The estimated number of acceptances is 32 / 0.5 + 4 / 0.125 = 64 + 32 = 96. Divide by the known 1,000 eligible pairs to obtain 9.6%."
+    },
+    "lessons": [
+      {
+        "title": "People who adapt to the model",
+        "url": "https://www.tensortonic.com/ml-design/adversaries"
+      },
+      {
+        "title": "New users and new items",
+        "url": "https://www.tensortonic.com/ml-design/cold-start"
+      },
+      {
+        "title": "A/B testing and safe rollout",
+        "url": "https://www.tensortonic.com/ml-design/experiments"
+      },
+      {
+        "title": "Feedback loops and exposure bias",
+        "url": "https://www.tensortonic.com/ml-design/feedback-loops"
+      }
+    ],
+    "series": {
+      "title": "LinkedIn People You May Know",
+      "url": "https://www.tensortonic.com/ml-design/people-you-may-know"
+    }
+  },
+  {
+    "slug": "design-restartable-training",
+    "title": "Finish a training run on preemptible GPUs",
+    "topic": "Training infrastructure",
+    "minutes": 55,
+    "level": "Advanced",
+    "retrieval": false,
+    "brief": "A speech team has one 40-hour reservation to pretrain a 3-billion-parameter encoder on 1.6 billion tokens. The training service owns sharding, data progress and recovery. Machines can leave during a checkpoint write. Define what a successful optimizer step means across workers and what can safely resume.",
+    "inputs": "The coordinator receives a run manifest, the surviving rank count, and checkpoint records. A record contains a finished optimizer step, the number of expected shards, verified shards, and a manifest-commit flag. In the example an input cursor identifies the next unread global batch.",
+    "outputs": "Return the latest usable checkpoint, the next optimizer step, and the stored next unread batch. A checkpoint is usable only when committed and all expected shards verify. Specify how a trainer restores additional state associated with that checkpoint.",
+    "sampleIn": {
+      "surviving_ranks": 32,
+      "checkpoints": [
+        {
+          "step": 80,
+          "expected_shards": 32,
+          "verified_shards": 32,
+          "committed": true,
+          "next_batch": 640
+        },
+        {
+          "step": 88,
+          "expected_shards": 32,
+          "verified_shards": 32,
+          "committed": false,
+          "next_batch": 704
+        },
+        {
+          "step": 96,
+          "expected_shards": 32,
+          "verified_shards": 31,
+          "committed": false,
+          "next_batch": 768
+        }
+      ]
+    },
+    "sampleOut": {
+      "restore_step": 80,
+      "next_step": 81,
+      "next_batch": 640
+    },
+    "why": "Step 88 has every shard but no committed manifest. Step 96 also lacks a shard. The verified commit at step 80 is the latest one the new process may trust.",
+    "constraints": [
+      "You have 32 GPUs with 48 GiB each. Unsharded model state needs 16 bytes per parameter, plus 12 GiB of measured activation memory per GPU.",
+      "Complete 1.6 billion tokens in 40 hours including checkpointing, evaluation and recovery.",
+      "A single preemption may require redoing at most 8 minutes of training. A committed snapshot occupies 48 GiB and durable storage sustains 6 GiB/s aggregate."
+    ],
+    "tasks": [
+      {
+        "title": "Budget memory and throughput",
+        "prompt": "Calculate the minimum sustained global tokens/s and estimate whether one unsharded replica fits. Allocate memory and time for the parallel scheme you select.",
+        "check": "Show about 11,112 tokens/s and 44.7 GiB for model state alone. Account for activations, transient all-gathers or pipeline buffers, and time when GPUs are doing no training."
+      },
+      {
+        "title": "Trace an optimizer step",
+        "prompt": "Walk one logical batch from immutable data shards to the next global optimizer step. Name the communication boundary, gradient accumulation rule and unit counted by the learning-rate schedule.",
+        "check": "Make the global tokens per update explicit. Ensure every rank uses consistent weights and clarify how padding and uneven final batches affect the reduction."
+      },
+      {
+        "title": "Commit and restore a snapshot",
+        "prompt": "Design the shard-write, verification and manifest protocol. Trace a crash immediately before publishing the manifest. Choose a checkpoint interval using the recovery bound.",
+        "check": "Include optimizer, scheduler, RNG and data cursor. Explain immutable shard identity and how incomplete generations are ignored. Count the minimum 8 s transfer and the age of the latest durable commit, including transfer overlap."
+      },
+      {
+        "title": "Prove recovery and find a slow rank",
+        "prompt": "Specify a kill-and-restart test, a quality check against an uninterrupted replay, and the telemetry that separates reading, collective communication and checkpoint stalls.",
+        "check": "Verify a contiguous sequence of committed batches. State your reproducibility tolerance. Compare rank-level and global progress instead of relying on average GPU utilization."
+      }
+    ],
+    "twist": {
+      "event": "After a rack fails, only 24 GPUs return. Storage still has a valid snapshot written by 32 ranks.",
+      "prompt": "Can the job resume at 24? Specify what must be resharded, how to preserve the global update, and when your system would wait or start a new run.",
+      "check": "Tie the decision to your checkpoint format, optimizer partitioning, world-size support, data assignment and remaining throughput. An unchanged local batch changes the global update unless compensated."
+    },
+    "sources": [
+      {
+        "title": "PyTorch · Getting Started with Fully Sharded Data Parallel",
+        "url": "https://docs.pytorch.org/tutorials/intermediate/FSDP_tutorial.html"
+      },
+      {
+        "title": "PyTorch · Asynchronous Saving with Distributed Checkpoint",
+        "url": "https://docs.pytorch.org/tutorials/recipes/distributed_async_checkpoint_recipe.html"
+      }
+    ],
+    "walkthrough": "Shard model state across ranks and use a fixed global token count per update, with gradient accumulation if transient all-gathers press on memory. Stage a consistent optimizer-boundary snapshot, write immutable rank shards asynchronously, then publish one verified manifest containing the global input cursor. A six-minute cadence leaves headroom under the eight-minute redo budget if staging and commit stay bounded; if a write approaches the limit, pause before exceeding the bound. Recovery loads only a committed generation and reassigns token ranges explicitly.",
+    "group": "ML infrastructure",
+    "family": "Distributed training",
+    "math": {
+      "family": "Distributed training",
+      "prompt": "A cluster keeps all 128 GPUs allocated for a 90-minute observation window. It spends 80 minutes on training steps, 4 writing a checkpoint and 6 recovering. Eight of the 80 training minutes produce steps later discarded after a failure. Training steps sustain 50% of peak FLOP/s. If only retained training FLOPs count, what percentage of allocated peak FLOPs advances the final checkpoint?",
+      "unit": "%",
+      "answer": 40,
+      "tolerance": 0.001,
+      "explanation": "The retained steps occupy 80 − 8 = 72 minutes. Their useful FLOPs are 0.50 × 72 = 36 peak-equivalent cluster-minutes. Over 90 allocated minutes, the useful fraction is 36 / 90 = 40%. The GPU count cancels."
+    },
+    "lessons": [
+      {
+        "title": "Training and prediction",
+        "url": "https://www.tensortonic.com/ml-design/training-and-prediction"
+      },
+      {
+        "title": "Building a baseline",
+        "url": "https://www.tensortonic.com/ml-design/baselines"
+      },
+      {
+        "title": "Training pipelines and versioning",
+        "url": "https://www.tensortonic.com/ml-design/training"
+      },
+      {
+        "title": "Latency, throughput, and cost",
+        "url": "https://www.tensortonic.com/ml-design/latency"
+      }
+    ],
+    "series": {
+      "title": "OpenAI Distributed Training",
+      "url": "https://www.tensortonic.com/ml-design/distributed-training"
+    }
+  },
+  {
+    "slug": "design-yard-perception",
+    "title": "Track people at a loading-yard blind corner",
+    "topic": "Edge perception",
+    "minutes": 50,
+    "level": "Advanced",
+    "retrieval": false,
+    "brief": "An operator display shows where people and carts were last seen around a yard vehicle. A camera and lidar run at different rates and occasionally deliver observations out of order. Design the on-device perception service that publishes time-stamped tracks and an explicit degraded status. Vehicle control is outside the exercise.",
+    "inputs": "A frame bundle carries a monotonic tick time and the latest available timestamp for each sensor. Detections include the source coordinate system and capture time. The service also holds calibration versions and live track state. A source older than 100 ms is stale.",
+    "outputs": "Publish observation time, status (ok or degraded), source names used, and tracks in the vehicle coordinate frame with position, confidence and last observation time. If every source is stale, emit degraded and an empty track list. The example isolates this deterministic branch.",
+    "sampleIn": {
+      "tick_ms": 1200,
+      "last_capture_ms": {
+        "camera": 1088,
+        "lidar": 1040
+      },
+      "previous_tracks": []
+    },
+    "sampleOut": {
+      "as_of_ms": 1200,
+      "status": "degraded",
+      "sources_used": [],
+      "tracks": []
+    },
+    "why": "The camera observation is 112 ms old and the lidar observation is 160 ms old. Neither qualifies. An empty track list with degraded status communicates missing evidence to the display.",
+    "constraints": [
+      "Publish at 20 Hz with a p99 sensor-to-publication latency budget of 80 ms on a single device.",
+      "Inference and tracking together have 6 GiB usable memory. The live pipeline must operate for 10 minutes with the network disconnected.",
+      "At each publication exclude sensor observations older than 100 ms. If only one source is usable, publish degraded and identify that source."
+    ],
+    "tasks": [
+      {
+        "title": "Define time and coordinate contracts",
+        "prompt": "Trace one late lidar packet through synchronization, calibration, motion compensation and track association. Choose what to do when camera and lidar disagree or a transformation is missing.",
+        "check": "Name capture time versus arrival time and the shared coordinate frame. Bound buffering. Include a policy for out-of-order packets, single-sensor frames and entirely stale input."
+      },
+      {
+        "title": "Fit the model on the device",
+        "prompt": "Choose an on-device baseline and fusion scheme. Allocate the latency and memory budgets to preprocessing, inference, tracking and publication. Explain how throughput stays at 20 Hz if a stage occasionally takes 70 ms.",
+        "check": "Distinguish a 50 ms arrival interval from the 80 ms deadline. Show parallelism or bounded load shedding and preserve timestamp semantics for dropped frames."
+      },
+      {
+        "title": "Design the replay evaluation",
+        "prompt": "Define labels and metrics for detecting a person and preserving their identity through occlusion. Choose a split that tests a previously unseen yard shift and report performance for night, rain and partial occlusion.",
+        "check": "Split by route, time or site before making clips. Pair a missed-person metric with false alerts and track fragmentation. Include deadline misses and stale-data behavior in the replay."
+      },
+      {
+        "title": "Release and diagnose a model update",
+        "prompt": "Describe which clips to retain, how labelers access them, and the offline and shadow tests required before showing a new model's tracks to operators.",
+        "check": "Include uncertainty-triggered clips and a representative sample, retention limits, versioned calibration, and a rollback that restores compatible weights and transforms."
+      }
+    ],
+    "twist": {
+      "event": "After a camera update, its timestamps lead the lidar clock by 140 ms. Average detection precision barely changes but tracks jump when people cross the corner.",
+      "prompt": "Design an alert and a replay that distinguish a bad clock offset from an association-model regression. Describe the operator-visible fallback.",
+      "check": "Use per-sensor age and alignment residuals, a controlled timestamp-shift replay and single-sensor comparisons. Specify the degraded status when aligned fusion is unavailable."
+    },
+    "sources": [
+      {
+        "title": "Waymo Open Dataset · Sensor sequences, calibration and object-track labels",
+        "url": "https://waymo.com/open/about/"
+      }
+    ],
+    "walkthrough": "Normalize capture times into one clock, transform detections into the vehicle frame, and fuse fresh observations before associating them to live tracks. When only one source passes the age and calibration checks, use its validated single-source path and label the display degraded. Bounded queues keep latency predictable at the cost of dropping old frames. Replay nighttime pedestrian crossings with synthetic timing skew to test missed tracks, identity switches and stale output together.",
+    "group": "Perception",
+    "family": "Perception",
+    "math": {
+      "family": "Perception",
+      "prompt": "In an offline camera replay, a new object can appear immediately after an exposure, so budget one full frame interval before it is captured. Frames arrive at 20 Hz. After capture, transfer costs 9 ms and postprocessing 8 ms. The three compute-path stages run serially, with no queueing. What is the largest inference-time budget that keeps event-to-output latency within 90 ms?",
+      "unit": "ms",
+      "answer": 23,
+      "tolerance": 0.001,
+      "explanation": "At 20 Hz, one frame interval is 1,000 / 20 = 50 ms. After reserving that interval, transfer and postprocessing, inference has 90 − 50 − 9 − 8 = 23 ms."
+    },
+    "lessons": [
+      {
+        "title": "Choosing features",
+        "url": "https://www.tensortonic.com/ml-design/features"
+      },
+      {
+        "title": "Reusing pretrained models",
+        "url": "https://www.tensortonic.com/ml-design/pretrained-models"
+      },
+      {
+        "title": "Error analysis and evaluation slices",
+        "url": "https://www.tensortonic.com/ml-design/error-analysis"
+      },
+      {
+        "title": "Fallbacks and model rollouts",
+        "url": "https://www.tensortonic.com/ml-design/fallbacks"
+      }
+    ],
+    "series": {
+      "title": "Tesla Autopilot Perception",
+      "url": "https://www.tensortonic.com/ml-design/street-view-blurring"
+    }
+  },
+  {
+    "slug": "design-sponsored-slot",
+    "title": "Estimate clicks for a sponsored listing",
+    "topic": "Ad prediction",
+    "minutes": 45,
+    "level": "Intermediate",
+    "retrieval": false,
+    "brief": "A campus marketplace sells one sponsored listing beside a search result. Sellers bid in cents per click. The auction relies on calibrated click probabilities to compare eligible listings, including new creatives with almost no exposure history. Build the estimator and the logging loop that lets you tell whether its numbers can be trusted.",
+    "inputs": "For each eligible listing receive an ad ID, bid in cents per click, and request-time context. The hand-check baseline receives past attributed clicks and mature impressions from the same placement. For the example use the empirical click fraction and assume both counts are sufficient. Production must also handle zero history.",
+    "outputs": "Return an ad ID, calibrated click probability and expected cents per impression for each candidate. Sort by expected cents descending, breaking ties by ad ID. Select the first listing. The auction handles charging separately.",
+    "sampleIn": {
+      "placement": "search_top",
+      "candidates": [
+        {
+          "id": "A",
+          "bid_cents": 80,
+          "clicks": 50,
+          "mature_impressions": 2500
+        },
+        {
+          "id": "B",
+          "bid_cents": 45,
+          "clicks": 30,
+          "mature_impressions": 1000
+        }
+      ]
+    },
+    "sampleOut": {
+      "ranked": [
+        {
+          "id": "A",
+          "p_click": 0.02,
+          "expected_cents": 1.6
+        },
+        {
+          "id": "B",
+          "p_click": 0.03,
+          "expected_cents": 1.35
+        }
+      ],
+      "winner": "A"
+    },
+    "why": "B has the higher click probability. Multiplying each probability by the bid gives 1.60 cents per impression for A and 1.35 for B. The example fixes a baseline score so its result is reproducible.",
+    "constraints": [
+      "Peak traffic is 3,000 auctions/s with up to 60 candidates per request. Scoring and calibration get 35 ms p99.",
+      "Attribute a click to its impression for 30 minutes. At most one click per impression counts.",
+      "The training store keeps all clicked impressions and independently samples 5% of mature nonclicked impressions. The evaluation stream is unsampled."
+    ],
+    "tasks": [
+      {
+        "title": "Build an impression ledger",
+        "prompt": "Specify how render, click and auction events become one time-consistent example. What identifies an impression, how do retries merge, and when may an unclicked row enter training?",
+        "check": "An auction win alone need not mean the listing rendered. Show a stable impression key, click deduplication, event-time handling and a full 30-minute negative-label window."
+      },
+      {
+        "title": "Make the probabilities usable in an auction",
+        "prompt": "Design a cold-start baseline and a learned scorer. Show how the unequal sampling affects a predicted probability and how you would train or recalibrate on the serving distribution.",
+        "check": "Give a concrete correction, for example inverse-probability weights of 20 for retained negatives and 1 for positives, or a justified prior correction. Validate calibration on unsampled impressions by placement and ad age."
+      },
+      {
+        "title": "Fit the decision in its deadline",
+        "prompt": "Sketch a batched scoring path for one auction. Estimate peak candidate scores/s, identify which features can be shared across a request, and give the response if the feature store times out.",
+        "check": "Account for up to 180,000 candidate scores/s. Bound feature fan-out and queueing, version the fallback score, and log whether it determined the winner."
+      },
+      {
+        "title": "Audit launch impact",
+        "prompt": "Choose an offline comparison and a controlled online test. Explain how you would detect a scorer whose ranks barely move while its probability estimates drift.",
+        "check": "Use probability-sensitive metrics such as log loss and reliability by bin, alongside rank quality, expected versus realized value, exposure mix and a viewer-facing guardrail."
+      }
+    ],
+    "twist": {
+      "event": "The mobile app starts reporting a second click when users navigate back. CTR rises only on the new app version. Auction revenue remains flat.",
+      "prompt": "Identify the first logs and slices you would inspect and decide whether to roll back the model, alter attribution or quarantine a data partition.",
+      "check": "Compare distinct clicked impression IDs against raw click counts and app versions. Preserve the original event stream for reprocessing before retraining."
+    },
+    "sources": [
+      {
+        "title": "Meta AI · Practical Lessons from Predicting Clicks on Ads at Facebook",
+        "url": "https://ai.meta.com/research/publications/practical-lessons-from-predicting-clicks-on-ads-at-facebook/"
+      }
+    ],
+    "walkthrough": "Log actual rendered impressions and deduplicated clicks, finish the attribution window, then join request-time features to those labels. Fit a regularized baseline with appropriately weighted sampled examples and compare reliability on a separate unsampled stream. Batch eligible listings in one scoring request, multiply calibrated click probability by bid, and fall back to smoothed placement estimates when fresh features miss the deadline. Calibration prioritizes usable auction values even when rank order alone looks healthy.",
+    "group": "Prediction and decisions",
+    "family": "Ad CTR",
+    "math": {
+      "family": "Ad CTR",
+      "prompt": "An ads calibration audit uses two fixed bins. All 4,000 impressions in the first bin had predicted click probability 1.0% and yielded 60 clicks. All 1,000 impressions in the second had predicted probability 10.0% and yielded 70 clicks. Compute expected calibration error as the impression-weighted mean absolute gap between predicted and observed CTR in each bin.",
+      "unit": "percentage points",
+      "answer": 1,
+      "tolerance": 0.001,
+      "explanation": "Observed CTRs are 1.5% and 7.0%. The weighted absolute gaps are (4,000 / 5,000) × 0.5 + (1,000 / 5,000) × 3.0 = 1.0 percentage point."
+    },
+    "lessons": [
+      {
+        "title": "Logging training examples",
+        "url": "https://www.tensortonic.com/ml-design/logging"
+      },
+      {
+        "title": "Choosing a model and loss",
+        "url": "https://www.tensortonic.com/ml-design/model-selection"
+      },
+      {
+        "title": "Classification metrics and thresholds",
+        "url": "https://www.tensortonic.com/ml-design/classification-metrics"
+      },
+      {
+        "title": "A/B testing and safe rollout",
+        "url": "https://www.tensortonic.com/ml-design/experiments"
+      }
+    ],
+    "series": {
+      "title": "Meta Ad Click Prediction",
+      "url": "https://www.tensortonic.com/ml-design/ad-click-prediction"
+    }
+  },
+  {
+    "slug": "design-notification-window",
+    "title": "Decide whether a notification is worth sending",
+    "topic": "Notification policy",
+    "minutes": 45,
+    "level": "Intermediate",
+    "retrieval": false,
+    "brief": "A learning app generates reminders for followed workshops and saved lessons. Every candidate can be sent, deferred or dropped. Learners choose quiet hours and a daily cap. Design the decision service to improve useful returns while respecting these controls across phones and tablets.",
+    "inputs": "Receive one or more candidate IDs, event type, creation and expiry times, plus the recipient's local time zone, quiet hours and deliveries already counted today. Expiry is exclusive. The example uses a policy that schedules every otherwise-eligible event at the first allowed time.",
+    "outputs": "Return one action per candidate. A deferred event includes its earliest scheduled local timestamp. Drop events that expire before or at the earliest allowed time. The scheduler rechecks consent, expiry and the cap immediately before delivery.",
+    "sampleIn": {
+      "now": "2026-04-09T22:35:00-04:00",
+      "time_zone": "America/New_York",
+      "quiet_local": [
+        "21:00",
+        "07:00"
+      ],
+      "sent_today": 1,
+      "daily_cap": 2,
+      "candidates": [
+        {
+          "id": "workshop",
+          "expires": "2026-04-10T06:45:00-04:00"
+        },
+        {
+          "id": "lesson",
+          "expires": "2026-04-10T19:00:00-04:00"
+        }
+      ]
+    },
+    "sampleOut": {
+      "decisions": [
+        {
+          "id": "workshop",
+          "action": "drop",
+          "reason": "expires_before_delivery"
+        },
+        {
+          "id": "lesson",
+          "action": "defer",
+          "at": "2026-04-10T07:00:00-04:00"
+        }
+      ]
+    },
+    "why": "Both requests arrive during quiet hours. The workshop expires before quiet hours end. The lesson remains useful at 07:00, when it can be reevaluated for delivery.",
+    "constraints": [
+      "Ingest 9 million candidates per day with peaks 8 times the daily average.",
+      "At most 2 noncritical notifications per recipient per local calendar day across every device. Respect a recipient's quiet hours across daylight-saving transitions.",
+      "Consent changes must propagate within 5 s. A scheduled job may be redelivered up to 3 times."
+    ],
+    "tasks": [
+      {
+        "title": "Make the delivery state machine explicit",
+        "prompt": "Trace a delayed reminder from intake through ranking, scheduling, cap reservation, push acknowledgement and retry. Show where quiet hours, expiry and consent are evaluated.",
+        "check": "Use one per-recipient budget across devices, an idempotency key and an explicit state for ambiguous provider acknowledgement. Define the local date at dispatch and what happens if a budget reservation expires."
+      },
+      {
+        "title": "Learn the value of an interruption",
+        "prompt": "Choose the outcome window and the unit of experimentation. Design a way to estimate the incremental value of sending when people who already planned to return are more likely to open.",
+        "check": "Include a randomized send/no-send comparison or another defensible counterfactual. Name a fatigue outcome and allow enough observation time for opt-outs and later returns."
+      },
+      {
+        "title": "Schedule peaks and monitor fatigue",
+        "prompt": "Size intake at the eightfold peak, then explain why delivery at the end of quiet hours could be much burstier. Give a strategy for draining a 07:00 backlog without sending expired reminders.",
+        "check": "Show about 833 candidates/s at peak intake, distinguish queued sends from intake, and include expiry checks, per-user serialization or atomic quota updates, and metrics for lateness, opt-outs and cap violations."
+      }
+    ],
+    "twist": {
+      "event": "A 07:00 provider timeout causes three workers to retry the same deferred reminder. One user disables reminders while those retries are queued.",
+      "prompt": "Give the state transition each retry should observe and say what guarantee you can make if the provider lacks idempotency keys.",
+      "check": "Recheck consent before dispatch. Explicitly handle a prior send whose outcome is unknown and explain the duplicate-delivery versus dropped-delivery trade-off."
+    },
+    "sources": [
+      {
+        "title": "Pinterest Engineering · User state-based notification volume optimization",
+        "url": "https://medium.com/pinterest-engineering/user-state-based-notification-volume-optimization-7764118f73ff"
+      }
+    ],
+    "walkthrough": "Log candidate creation, delivery opportunity, consent, action and later return whether or not a message was sent. Estimate incremental return with a randomized holdout, then choose from eligible actions under a per-recipient daily cap. Keep deferrals keyed by event, apply quiet hours in local time, and recheck consent, expiry and a shared quota at dispatch. A shorter backlog and fewer duplicates may justify dropping an uncertain low-value reminder.",
+    "group": "Prediction and decisions",
+    "family": "Notifications",
+    "math": {
+      "family": "Notifications",
+      "prompt": "A randomized notification trial assigns 10,000 users to a send policy and 10,000 to holdout. Only 6,000 policy users actually receive a push, one each. No holdout user receives one. Within the same window, 320 policy users and 290 holdout users return. Assume assignment can affect a return only through delivery and there are no spillovers. Estimate the incremental returns per 1,000 delivered pushes.",
+      "unit": "returns per 1,000 deliveries",
+      "answer": 5,
+      "tolerance": 0.001,
+      "explanation": "Equal-sized arms yield 320 − 290 = 30 incremental returns for the send policy. Spread over the 6,000 delivered pushes, that is 30 × 1,000 / 6,000 = 5 incremental returns per 1,000 deliveries."
+    },
+    "lessons": [
+      {
+        "title": "From business goal to ML task",
+        "url": "https://www.tensortonic.com/ml-design/ml-objective"
+      },
+      {
+        "title": "Labels and delayed outcomes",
+        "url": "https://www.tensortonic.com/ml-design/labels"
+      },
+      {
+        "title": "A/B testing and safe rollout",
+        "url": "https://www.tensortonic.com/ml-design/experiments"
+      },
+      {
+        "title": "Feedback loops and exposure bias",
+        "url": "https://www.tensortonic.com/ml-design/feedback-loops"
+      }
+    ],
+    "series": {
+      "title": "Apple Notification Ranking",
+      "url": "https://www.tensortonic.com/ml-design/notification-ranking"
+    }
+  },
+  {
+    "slug": "design-compatible-accessories",
+    "title": "Rank compatible accessories for a pickup order",
+    "topic": "Commerce recommendations",
+    "minutes": 45,
+    "level": "Intermediate",
+    "retrieval": false,
+    "brief": "A bicycle retailer wants to show accessories beside an item in a customer's pickup cart. The catalog team supplies plausible candidates. Your service must rank useful complements, verify mechanical compatibility, and avoid sending shoppers to collect an item their selected store cannot supply.",
+    "inputs": "The cart supplies an anchor SKU, its mount standard, a store ID and requested list size. Supplied candidates include mount standard (null means unknown), currently available quantity, units already in the cart, and a relevance score. For the sample every candidate is a mount-specific accessory.",
+    "outputs": "Return up to k eligible SKUs in descending score, breaking ties by SKU. Exclude incompatible or unverified mounts, out-of-stock items and SKUs already in the cart. An empty shelf is valid.",
+    "sampleIn": {
+      "anchor": {
+        "sku": "light-kit",
+        "mount": "M2"
+      },
+      "store": "north",
+      "k": 3,
+      "candidates": [
+        {
+          "sku": "bracket-B",
+          "mount": "M1",
+          "qty": 6,
+          "in_cart": 0,
+          "score": 0.94
+        },
+        {
+          "sku": "strap-L",
+          "mount": "M2",
+          "qty": 0,
+          "in_cart": 0,
+          "score": 0.86
+        },
+        {
+          "sku": "clamp-M",
+          "mount": "M2",
+          "qty": 4,
+          "in_cart": 0,
+          "score": 0.72
+        },
+        {
+          "sku": "clip-X",
+          "mount": null,
+          "qty": 3,
+          "in_cart": 0,
+          "score": 0.85
+        }
+      ]
+    },
+    "sampleOut": {
+      "skus": [
+        "clamp-M"
+      ]
+    },
+    "why": "The bracket has the wrong mount, the strap is unavailable, and the clip has no verified mount. Only the clamp survives. A high score cannot override these constraints.",
+    "constraints": [
+      "The catalog has 450,000 SKUs across 240 locations. Each request contains at most 150 supplied candidates.",
+      "Handle 1,200 shelf requests/s with a 75 ms p99 response deadline.",
+      "Inventory snapshots used for a positive availability decision may be at most 20 s old. Compatibility corrections must be visible within 2 minutes."
+    ],
+    "tasks": [
+      {
+        "title": "Define an accessory purchase example",
+        "prompt": "Design the training table and baseline. Separate a complement from a replacement part or substitute. Explain how to label an accessory bought, returned for incompatibility, or never shown because the store had no stock.",
+        "check": "Use time-aware impression and order joins with a return window. A stockout provides no negative preference label. Include a baseline against which personalization demonstrates incremental value."
+      },
+      {
+        "title": "Build the serving boundary",
+        "prompt": "Draw the scoring, catalog and per-store inventory path. For an old inventory snapshot or unknown mount standard, state exactly when a candidate disappears and when the entire shelf is omitted.",
+        "check": "Retain the ability to enforce hard constraints after cache access and after scoring. Include key dimensions and invalidation/freshness rules for each cache and a reason for returning fewer than k."
+      },
+      {
+        "title": "Decide whether personalization helps",
+        "prompt": "Define offline and live measures for ranking useful additions. Propose a test that distinguishes added purchases from orders shifted away from other surfaces or later returned.",
+        "check": "Include compatible add-ons per eligible cart, wrong-fit returns and a checkout guardrail. Split by time, new items, store inventory density and new customers. Describe when outcomes are mature."
+      }
+    ],
+    "twist": {
+      "event": "A single compatibility correction marks a popular mount as incompatible across all 240 stores. Long-lived personalized response caches still contain it.",
+      "prompt": "Trace a correction through two cached requests, one immediately after publication and one at the two-minute deadline. Design an audit for stale displays.",
+      "check": "Use a versioned compatibility relation or current exclusion overlay at the final output boundary. Measure corrected-SKU impressions by version and define behavior when the overlay is unavailable."
+    },
+    "sources": [
+      {
+        "title": "Amazon Science · Personalized complementary product recommendation",
+        "url": "https://www.amazon.science/publications/personalized-complementary-product-recommendation"
+      }
+    ],
+    "walkthrough": "Join shown accessories to orders and later wrong-fit returns, and train a modest ranker alongside a co-purchase baseline. Filter by versioned mount compatibility, score the remaining candidates and check current per-store availability just before returning the shelf. Cache reusable scores across inventory updates, while keeping availability and corrected eligibility independent. This gives up some cache reuse and sometimes returns a shorter shelf to avoid bad purchases.",
+    "group": "Recommendations",
+    "family": "Shopping recommendations",
+    "math": {
+      "family": "Shopping recommendations",
+      "prompt": "A shelf must fill two distinct product slots. Three eligible products independently pass the final inventory check with probabilities 0.8, 0.8 and 0.5. The service can use any two that pass. What percentage of requests can fill both slots without calling the fallback?",
+      "unit": "%",
+      "answer": 80,
+      "tolerance": 0.001,
+      "explanation": "Both of the first two pass with probability 0.8² = 0.64. Exactly one of them passes with probability 2 × 0.8 × 0.2 = 0.32, and the third then rescues the shelf half the time. Coverage is 0.64 + 0.32 × 0.5 = 80%."
+    },
+    "lessons": [
+      {
+        "title": "New users and new items",
+        "url": "https://www.tensortonic.com/ml-design/cold-start"
+      },
+      {
+        "title": "Retrieval and ranking metrics",
+        "url": "https://www.tensortonic.com/ml-design/ranking-metrics"
+      },
+      {
+        "title": "Retrieval and ranking pipelines",
+        "url": "https://www.tensortonic.com/ml-design/retrieval-ranking"
+      },
+      {
+        "title": "Fallbacks and model rollouts",
+        "url": "https://www.tensortonic.com/ml-design/fallbacks"
+      }
+    ],
+    "series": {
+      "title": "Amazon Product Recommendation",
+      "url": "https://www.tensortonic.com/ml-design/scale-recommendation"
+    }
+  },
+  {
+    "slug": "design-next-lesson-video",
+    "title": "Choose the next video in a learning session",
+    "topic": "Video recommendations",
+    "minutes": 50,
+    "level": "Advanced",
+    "retrieval": false,
+    "brief": "A video-learning service already supplies 250 plausible next lessons per viewer. Your team owns the homepage shelf. Learners abandon it when autoplay repeats material they finished or fills every slot with the same creator. Balance immediate viewing with whether learners later say the lesson helped.",
+    "inputs": "Receive learner history, requested slot count, current language setting and scored candidates. Each has a video ID, language, creator and completion flag. In the example sort descending by the supplied score, then enforce eligible language, exclude completed videos and show at most one per creator. Break ties by ID.",
+    "outputs": "Return up to k distinct video IDs in display order. The sample fixes scores and the slate policy. Your design explains how production learns those scores from biased viewing and sparse feedback.",
+    "sampleIn": {
+      "k": 3,
+      "language": "en",
+      "candidates": [
+        {
+          "id": "v9",
+          "lang": "en",
+          "creator": "R",
+          "completed": true,
+          "score": 0.99
+        },
+        {
+          "id": "v2",
+          "lang": "en",
+          "creator": "K",
+          "completed": false,
+          "score": 0.83
+        },
+        {
+          "id": "v4",
+          "lang": "en",
+          "creator": "K",
+          "completed": false,
+          "score": 0.81
+        },
+        {
+          "id": "v5",
+          "lang": "es",
+          "creator": "M",
+          "completed": false,
+          "score": 0.79
+        },
+        {
+          "id": "v3",
+          "lang": "en",
+          "creator": "J",
+          "completed": false,
+          "score": 0.68
+        }
+      ]
+    },
+    "sampleOut": {
+      "video_ids": [
+        "v2",
+        "v3"
+      ]
+    },
+    "why": "The top-scoring video is already completed. V2 claims creator K's slot, so V4 is skipped. V5 has the wrong language and V3 is eligible. Two entries satisfy the shelf rules.",
+    "constraints": [
+      "Score at most 250 supplied candidates per shelf at 2,400 requests/s peak. The shelf has an 85 ms p99 deadline.",
+      "Just-finished videos must disappear from a learner's shelf within 3 s. Feedback surveys arrive up to 7 days after viewing.",
+      "Only 1 in 100 eligible impressions is selected for a survey invitation. Response is optional and the invitation probability is logged."
+    ],
+    "tasks": [
+      {
+        "title": "Define session and satisfaction labels",
+        "prompt": "Choose training targets for a short tutorial and a long lecture. Explain what comparison of raw watch minutes would favor and how autoplay differs from an intentional start.",
+        "check": "Account for video length, explicit choice and completed versus abandoned views. Distinguish survey invitation from survey response and avoid interpreting missing feedback as dissatisfaction."
+      },
+      {
+        "title": "Serve a constrained shelf",
+        "prompt": "Map request-time, streaming and batch features to their owners. Compute peak scoring volume, enforce recent completions and creator diversity, and define a fallback when the scoring service times out.",
+        "check": "Account for up to 600,000 candidate scores/s. Put just-finished exclusions after cached lists and specify a deadline-aware fallback that still obeys language and diversity constraints."
+      },
+      {
+        "title": "Measure selection bias and long-term value",
+        "prompt": "Describe how logged positions, autoplay and optional surveys distort feedback. Design a controlled rollout with near-term metrics, a delayed satisfaction readout, and a check for new creators.",
+        "check": "Log exposure and position; distinguish invitation weighting from self-selection among respondents. Compare randomized traffic with a stable holdout and wait for mature survey windows. Include a guardrail for hides or repeated recommendations."
+      },
+      {
+        "title": "Compare candidate and ranking failures",
+        "prompt": "A learner reports that none of the recommended lessons follow the course topic. What would you capture to determine whether the supplied set lacked eligible lessons or the shelf ordering hid them?",
+        "check": "Trace one request through incoming candidate IDs, eligibility/filter reasons and score versions. Explain how to evaluate reranking on a fixed candidate set without owning candidate generation."
+      }
+    ],
+    "twist": {
+      "event": "An experiment raises watch minutes by 12%, yet the new ranker shows many more hour-long lectures and survey response rates fall for short-video viewers.",
+      "prompt": "Specify two comparisons that could separate a genuine satisfaction gain from a length or response-mix effect. Decide what result would stop the ramp.",
+      "check": "Compare length-conditioned viewing and per-eligible-viewer outcomes, then examine invitation, response and satisfaction separately. State a falsifiable guardrail and a decision for ambiguous delayed evidence."
+    },
+    "sources": [
+      {
+        "title": "Google Research · Recommending What Video to Watch Next: A Multitask Ranking System",
+        "url": "https://research.google/pubs/recommending-what-video-to-watch-next-a-multitask-ranking-system/"
+      }
+    ],
+    "walkthrough": "Start with a length-aware viewing estimate, then blend in a separately validated satisfaction signal and compare against a simple topic-recency ranker. Cache slow features, batch the 250 supplied candidates, and enforce eligibility, recent completions and creator caps on the final order. Record survey invitations and response rates separately and use a randomized holdout to measure effects after the seven-day feedback window. The cap can sacrifice predicted immediate watch time to reduce repetitive shelves.",
+    "group": "Recommendations",
+    "family": "Video",
+    "math": {
+      "family": "Video",
+      "prompt": "In a test of one video slot, candidate A starts on 50% of impressions and averages 100 watched seconds conditional on a start. Candidate B starts on 20% and averages 300 watched seconds conditional on a start. An unstarted impression contributes zero. At 1,000 impressions, how many additional expected watch minutes does B deliver over A? Round to one decimal place.",
+      "unit": "minutes per 1,000 impressions",
+      "answer": 166.6666666667,
+      "tolerance": 0.0501,
+      "explanation": "A delivers 0.5 × 100 = 50 seconds per impression and B delivers 0.2 × 300 = 60. The difference is 1,000 × 10 / 60 ≈ 166.7 watch minutes."
+    },
+    "lessons": [
+      {
+        "title": "Retrieval and ranking metrics",
+        "url": "https://www.tensortonic.com/ml-design/ranking-metrics"
+      },
+      {
+        "title": "Retrieval and ranking pipelines",
+        "url": "https://www.tensortonic.com/ml-design/retrieval-ranking"
+      },
+      {
+        "title": "Feedback loops and exposure bias",
+        "url": "https://www.tensortonic.com/ml-design/feedback-loops"
+      },
+      {
+        "title": "Walkthrough: Video Recommendation Design",
+        "url": "https://www.tensortonic.com/ml-design/interview-walkthrough-recommendation"
+      }
+    ],
+    "series": {
+      "title": "YouTube Video Recommendation System",
+      "url": "https://www.tensortonic.com/ml-design/video-recommendation"
+    }
+  },
+  {
+    "slug": "design-station-autocomplete",
+    "walkthrough": "Publish versioned prefix indexes by city and language and keep display names separate from normalized aliases. Cache candidate IDs for common prefixes, rerank the small set using coarse location, then check availability against a revisioned closure map before rendering. A shared cache reduces backend work, but caching the final personalized response would complicate closure enforcement.",
+    "title": "Complete a station name as the rider types",
+    "topic": "Search",
+    "minutes": 35,
+    "level": "Intermediate",
+    "retrieval": true,
+    "brief": "A regional journey planner wants riders to select an operating station before they finish typing its name. Misspellings and local nicknames are common. Stations also close during service disruptions. Design the completion service from publication of a station change through the next keystroke.",
+    "inputs": "The online request contains a city, typed prefix, language, optional coarse location, and requested limit. A separate catalogue stream publishes station IDs, localized display names, approved aliases, coordinates, and availability revisions. The example includes a small snapshot to make the decision inspectable.",
+    "outputs": "Return at most limit distinct, operating stations in order, each with its stable ID and display name. An empty list is valid. Describe the normalization and matching policy that makes a suggestion eligible.",
+    "sampleIn": {
+      "request": {
+        "city": "lakeport",
+        "prefix": "harb",
+        "language": "en",
+        "limit": 2
+      },
+      "stations": [
+        {
+          "id": "A",
+          "name": "Ferry Quay",
+          "aliases": [
+            "Harbor Ferry"
+          ],
+          "open": true
+        },
+        {
+          "id": "B",
+          "name": "Harbor East",
+          "aliases": [],
+          "open": false
+        },
+        {
+          "id": "C",
+          "name": "Harbor Market",
+          "aliases": [],
+          "open": true
+        }
+      ]
+    },
+    "sampleOut": {
+      "suggestions": [
+        {
+          "id": "C",
+          "name": "Harbor Market"
+        },
+        {
+          "id": "A",
+          "name": "Ferry Quay"
+        }
+      ]
+    },
+    "why": "One valid ranking favors a display-name prefix over an approved alias. It still finds Ferry Quay through Harbor Ferry. The closed Harbor East must disappear regardless of its historical popularity.",
+    "constraints": [
+      "Budget 45 ms at p99 for 18,000 peak requests/s across all cities.",
+      "The catalogue contains 3 million entities. A closure must suppress an existing suggestion within 45 seconds.",
+      "Return up to 5 suggestions per keystroke. A city may send 20 successive availability updates for the same station in one minute."
+    ],
+    "tasks": [
+      {
+        "title": "Define a match",
+        "prompt": "Specify how the baseline matches a typed prefix to a stable station ID. Walk through accented names, a multilingual alias, and two names pointing to one station.",
+        "check": "Trace one alias through normalization, matching, deduplication, and display. Explain which transformations follow the language and which display strings remain untouched."
+      },
+      {
+        "title": "Budget the keystroke path",
+        "prompt": "Draw the read path and storage layout. Estimate the backend load if a cache serves 85% of requests. Explain what a cache key includes when location changes the ordering.",
+        "check": "The miss path must handle 2,700 requests/s at that hit rate. Allocate the deadline across hops and explain how one very common prefix is served during a burst."
+      },
+      {
+        "title": "Publish a closure",
+        "prompt": "Show where a late closure beats a cached result. Define an out-of-order update policy and a test that bounds the time closed stations remain visible.",
+        "check": "Use revisions or another explicit source of truth, enforce availability after any stale retrieval, and measure propagation at the edge."
+      },
+      {
+        "title": "Measure whether riders finish sooner",
+        "prompt": "Define an offline replay and a live experiment that distinguish convenient suggestions from accidental taps.",
+        "check": "Measure successful station selections with a keystroke or time metric. Include city, script, and long-tail station slices plus an abandonment guardrail."
+      }
+    ],
+    "twist": {
+      "event": "The busiest city publishes a broken alias file that maps every airport query to a ferry stop.",
+      "prompt": "How do you roll back the alias index while continuing to honor station closures that arrived after that index was built?",
+      "check": "Separate versioned alias data from live availability or show an equivalent replay mechanism. A rollback test should include a recently closed station."
+    },
+    "sources": [
+      {
+        "title": "Google Search · How autocomplete predictions are generated",
+        "url": "https://blog.google/products-and-platforms/products/search/how-google-autocomplete-predictions-work/"
+      }
+    ],
+    "group": "Search and generation",
+    "family": "Autocomplete",
+    "math": {
+      "family": "Autocomplete",
+      "prompt": "Every autocomplete cache hit finishes within 40 ms. Exactly 25% of misses exceed 40 ms even after tuning. What minimum cache hit percentage ensures at least 99% of all requests finish within 40 ms?",
+      "unit": "%",
+      "answer": 96,
+      "tolerance": 0.001,
+      "explanation": "Only misses can be late. If h is the hit fraction, the late fraction is 0.25 × (1 − h). To keep it at or below 0.01 requires 1 − h ≤ 0.04, so the hit rate must be at least 96%."
+    },
+    "lessons": [
+      {
+        "title": "Scale and latency estimates",
+        "url": "https://www.tensortonic.com/ml-design/scale-and-latency"
+      },
+      {
+        "title": "Batch, online, and streaming inference",
+        "url": "https://www.tensortonic.com/ml-design/inference"
+      },
+      {
+        "title": "Latency, throughput, and cost",
+        "url": "https://www.tensortonic.com/ml-design/latency"
+      },
+      {
+        "title": "Fallbacks and model rollouts",
+        "url": "https://www.tensortonic.com/ml-design/fallbacks"
+      }
+    ],
+    "series": {
+      "title": "Google Autocomplete",
+      "url": "https://www.tensortonic.com/ml-design/autocomplete"
+    }
+  },
+  {
+    "slug": "design-shift-handbook",
+    "walkthrough": "Index sections by revision with lexical and embedding search. Filter candidates by plant, equipment, effective date and permissions before assembling evidence, then verify cited spans against the same records immediately before release. If the permission service or a required supersession check is unavailable, abstain. This gives up some answer coverage to keep an old instruction or restricted passage from being served.",
+    "title": "Answer shift questions with the current handbook",
+    "topic": "Grounded generation",
+    "minutes": 50,
+    "level": "Advanced",
+    "retrieval": true,
+    "brief": "Operations crews ask a handbook assistant questions at shift change. Answers can depend on the plant, equipment revision, and access group. Design a service that cites the exact source and can abstain when there is no authorized current answer.",
+    "inputs": "A request contains a question, plant, equipment revision, and authenticated group. The document service supplies versioned sections, their access groups, effective status and text. The example includes the relevant fixture sections.",
+    "outputs": "Return a status of answered or insufficient_evidence, text, and a list of section citations with version IDs. Every operational claim needs evidence visible to the caller. For insufficient evidence, return no citations and explain what information is missing without exposing restricted material.",
+    "sampleIn": {
+      "request": {
+        "question": "Which log records a sensor recalibration?",
+        "plant": "Juniper",
+        "equipment": "P3",
+        "group": "technician"
+      },
+      "sections": [
+        {
+          "id": "QA.4",
+          "version": "v8",
+          "plant": "Juniper",
+          "equipment": "P3",
+          "groups": [
+            "technician"
+          ],
+          "effective": true,
+          "text": "Record recalibrations in the blue calibration log."
+        },
+        {
+          "id": "QA.4",
+          "version": "v7",
+          "plant": "Juniper",
+          "equipment": "P3",
+          "groups": [
+            "technician"
+          ],
+          "effective": false,
+          "text": "Record recalibrations in the shift diary."
+        }
+      ]
+    },
+    "sampleOut": {
+      "status": "answered",
+      "text": "Use the blue calibration log.",
+      "citations": [
+        {
+          "section": "QA.4",
+          "version": "v8"
+        }
+      ]
+    },
+    "why": "The active section supports the answer directly. Its superseded version gives a conflicting instruction. Alternative wording is valid if the same factual claim has an eligible citation.",
+    "constraints": [
+      "Serve 600 peak questions/min across 90 plants. Return the full response within 3 seconds at p95.",
+      "The corpus has 240,000 versioned sections. Permission revocations must take effect on every subsequent response within 60 seconds.",
+      "A daily validation set of 1,500 questions includes at least 200 questions with no supported answer."
+    ],
+    "tasks": [
+      {
+        "title": "Protect the evidence boundary",
+        "prompt": "Diagram ingest, indexing, access checks, and response caching. Trace a question with the same words from technicians at two plants.",
+        "check": "Show which checks run before passages reach the generator, where version eligibility is enforced, and how cached answers respect group membership changes."
+      },
+      {
+        "title": "Trace competing passages",
+        "prompt": "Choose a baseline for part numbers and natural-language descriptions. Show exactly how retrieval, version resolution and citation selection handle the two QA.4 sections in the example.",
+        "check": "Measure whether the correct section enters the evidence set separately from whether the generated claim is supported. Record the document revision for reproducibility."
+      },
+      {
+        "title": "Set an abstention policy",
+        "prompt": "Specify behavior for missing evidence and two contradictory active documents. Build a labeled test set covering both, then pick an operating point.",
+        "check": "Report unsupported-answer rate and coverage together. Explain the outcome for an answered question with a correct fact but an inaccessible citation."
+      },
+      {
+        "title": "Operate with a deadline",
+        "prompt": "Assign the latency budget across retrieval and generation. Design a fallback for a stalled generator and a rollback for an index build that drops one plant.",
+        "check": "Show what the user receives at timeout, how alarms distinguish the two failures, and how rollback preserves newer access revocations."
+      }
+    ],
+    "twist": {
+      "event": "A global emergency bulletin supersedes local text, but the index for one plant is two hours behind.",
+      "prompt": "Describe what a technician at that plant receives before the new passages become searchable.",
+      "check": "Define a freshness or supersession signal outside the stale index and show when the service abstains or uses a verified replacement."
+    },
+    "sources": [
+      {
+        "title": "Anthropic · Contextual retrieval",
+        "url": "https://www.anthropic.com/research/contextual-retrieval"
+      }
+    ],
+    "group": "Search and generation",
+    "family": "RAG",
+    "math": {
+      "family": "RAG",
+      "prompt": "Every question in a test needs two distinct pieces of evidence, A and B. Retrieval returns A on 80% of questions, B on 70%, and at least one on 92%. The generator gives a correct fully supported answer on 90% of questions where both are present, and cannot produce one otherwise. What percentage of all questions receive a correct fully supported answer?",
+      "unit": "%",
+      "answer": 52.2,
+      "tolerance": 0.001,
+      "explanation": "Inclusion-exclusion gives the share with both pieces as 0.80 + 0.70 − 0.92 = 0.58. The share answering correctly with all required support is 0.58 × 0.90 = 52.2%."
+    },
+    "lessons": [
+      {
+        "title": "Embeddings and similarity search",
+        "url": "https://www.tensortonic.com/ml-design/embeddings"
+      },
+      {
+        "title": "Evaluating generated answers",
+        "url": "https://www.tensortonic.com/ml-design/generative-evaluation"
+      },
+      {
+        "title": "Fallbacks and model rollouts",
+        "url": "https://www.tensortonic.com/ml-design/fallbacks"
+      },
+      {
+        "title": "LLM serving and RAG",
+        "url": "https://www.tensortonic.com/ml-design/llm-serving"
+      }
+    ],
+    "series": {
+      "title": "Anthropic RAG System",
+      "url": "https://www.tensortonic.com/ml-design/rag-system"
+    }
+  },
+  {
+    "slug": "design-nightly-scoring",
+    "walkthrough": "Consume revision IDs into a deduplicated change table, recompute changed rows, and merge them into an immutable snapshot keyed by revision and model. Validate counts and quality before moving a single pointer that the dashboard reads. Four full runs replacing four incremental days plus 26 incremental runs cost about $813 including fixed costs, leaving about $87 for overhead and retries. Eight workers complete a full run in about 3.7 hours before overhead, so extra workers buy deadline margin without reducing total work.",
+    "title": "Move a catalog scorer onto a nightly budget",
+    "topic": "ML infrastructure",
+    "minutes": 45,
+    "level": "Intermediate",
+    "retrieval": false,
+    "brief": "Merchandisers inspect a quality flag for each catalog listing during a morning review. The current service runs an always-on model on every dashboard read. You own a migration to versioned precomputed scores under a monthly budget. Keep yesterday’s dashboard usable while today’s scores are built.",
+    "inputs": "The scoring job consumes listing revisions, a model version, and a nightly cutoff. The dashboard looks up a listing in the latest complete published snapshot. The example shows two manifests and a read request.",
+    "outputs": "A dashboard read returns the flag and the exact published snapshot, model, and input revision that produced it. If a listing has never been scored, return pending. Define how the dashboard reports staleness after a missed publication.",
+    "sampleIn": {
+      "lookup": "L8",
+      "manifests": [
+        {
+          "snapshot": "Mon",
+          "complete": true,
+          "model": "m4",
+          "records": [
+            {
+              "id": "L8",
+              "revision": 17,
+              "flag": "review"
+            }
+          ]
+        },
+        {
+          "snapshot": "Tue",
+          "complete": false,
+          "model": "m5",
+          "records": [
+            {
+              "id": "L8",
+              "revision": 18,
+              "flag": "clear"
+            }
+          ]
+        }
+      ]
+    },
+    "sampleOut": {
+      "id": "L8",
+      "flag": "review",
+      "snapshot": "Mon",
+      "model": "m4",
+      "revision": 17
+    },
+    "why": "The Tuesday job already produced a row for L8, but the whole snapshot has not passed publication checks. The reader stays on the last complete manifest. This property prevents a partial model switch.",
+    "constraints": [
+      "8 million listings, 2% with changed inputs per day. All changed rows must be ready within a 4-hour nightly window.",
+      "A worker handles 75 rows/s and costs $4.50/worker-hour. Use 30 days, 4 complete model rescans, and $210/month of fixed storage and serving costs.",
+      "Keep estimated total spending below $900/month. The daily dashboard serves 12 million reads with a 60 ms p95 lookup budget."
+    ],
+    "tasks": [
+      {
+        "title": "Size the migration",
+        "prompt": "Compare nightly full rescoring with incremental work plus four complete rescans. Budget workers for a full-scan night and quantify the margin for failures.",
+        "check": "A full pass costs about 29.63 worker-hours, requiring at least 8 parallel workers for four hours before overhead. State whether full-scan nights replace or supplement incremental runs. Account for the fixed $210."
+      },
+      {
+        "title": "Define the snapshot boundary",
+        "prompt": "Draw the path from revisions to dashboard lookup. Define the record identity, manifest contents, publication rule, and policy for edits arriving after the cutoff.",
+        "check": "A retry cannot publish a partial snapshot or duplicate a revision. Trace a late input and a model change, including the snapshot still served to readers."
+      },
+      {
+        "title": "Prove equivalent quality",
+        "prompt": "Design a shadow comparison against the old endpoint using the same model and input revision. Pick checks for score differences, coverage and stale rows before cutover.",
+        "check": "Compare identical inputs, give an explicit go/no-go criterion, and explain which discrepancies are expected if a live endpoint saw fresher data."
+      }
+    ],
+    "twist": {
+      "event": "An hourly source job silently stops updating 6% of listings. The nightly scorer finishes early and its normal success metric stays green.",
+      "prompt": "How do you detect incomplete source coverage and decide whether to publish without using the entire remaining budget?",
+      "check": "Reconcile by source partition or watermark, separate input completeness from job success, and calculate the scope of the backfill."
+    },
+    "sources": [
+      {
+        "title": "AWS · Cost analysis for hosted and batch inference",
+        "url": "https://aws.amazon.com/blogs/machine-learning/part-5-analyze-amazon-sagemaker-spend-and-determine-cost-optimization-opportunities-based-on-usage-part-5-hosting/"
+      },
+      {
+        "title": "AWS · Batch transform for inference",
+        "url": "https://docs.aws.amazon.com/sagemaker/latest/dg/batch-transform.html"
+      }
+    ],
+    "group": "ML infrastructure",
+    "family": "Cost-optimized ML serving",
+    "math": {
+      "family": "Cost-optimized ML serving",
+      "prompt": "A monthly serving plan handles 4 million requests under a $7,600 budget, including $1,200 fixed infrastructure. Screening all traffic costs $0.40 per thousand requests. Each request escalated to the larger model adds $0.006 beyond screening. What maximum percentage of requests can be escalated?",
+      "unit": "%",
+      "answer": 20,
+      "tolerance": 0.001,
+      "explanation": "Screening costs 4,000 × $0.40 = $1,600. The remaining $7,600 − $1,200 − $1,600 = $4,800 buys 800,000 escalations at $0.006 each. That is 20% of 4 million requests."
+    },
+    "lessons": [
+      {
+        "title": "Scale and latency estimates",
+        "url": "https://www.tensortonic.com/ml-design/scale-and-latency"
+      },
+      {
+        "title": "Building a baseline",
+        "url": "https://www.tensortonic.com/ml-design/baselines"
+      },
+      {
+        "title": "Batch, online, and streaming inference",
+        "url": "https://www.tensortonic.com/ml-design/inference"
+      },
+      {
+        "title": "Latency, throughput, and cost",
+        "url": "https://www.tensortonic.com/ml-design/latency"
+      }
+    ],
+    "series": {
+      "title": "ByteDance Cost-Optimize Pipeline",
+      "url": "https://www.tensortonic.com/ml-design/cost-optimize"
+    }
+  },
+  {
+    "slug": "design-listening-queue",
+    "walkthrough": "Use a simple affinity model trained from logged impressions and explicit skips to score the supplied tracks. Build a queue one slot at a time, filtering content and the previous artist before choosing a track and counting unfamiliar artists per block. Refresh from recent skips on the next request. A greedy sequencer is quick to serve but can spend a scarce artist option early, so compare it with a short lookahead on feasible queue length and replay rate.",
+    "title": "Sequence the next tracks on a shared radio",
+    "topic": "Recommendation",
+    "minutes": 40,
+    "level": "Intermediate",
+    "retrieval": false,
+    "brief": "A listener starts a short radio session in a shared car. A licensed track pool is supplied by a separate service. Design the sequencing policy so a queue balances familiar tracks with discovery and responds to a skip without playing the same artist twice in a row.",
+    "inputs": "Each request supplies the last artist played, an explicit-content setting, an ordered listening history, a candidate set with stable track and artist IDs, and the desired queue length. A candidate can carry an illustrative estimated save probability.",
+    "outputs": "Return an ordered list of distinct eligible track IDs, at most the requested length. Adjacent tracks, including the last already played, must have different artists. Return fewer tracks if the constraints exhaust the eligible pool.",
+    "sampleIn": {
+      "last_artist": "Iris",
+      "explicit_allowed": false,
+      "limit": 2,
+      "history": [
+        {
+          "track": "a0",
+          "event": "completed"
+        }
+      ],
+      "candidates": [
+        {
+          "id": "a1",
+          "artist": "Iris",
+          "p_save": 0.8,
+          "explicit": false
+        },
+        {
+          "id": "b4",
+          "artist": "Mica",
+          "p_save": 0.6,
+          "explicit": false
+        },
+        {
+          "id": "d7",
+          "artist": "Elm",
+          "p_save": 0.9,
+          "explicit": true
+        }
+      ]
+    },
+    "sampleOut": {
+      "queue": [
+        "b4",
+        "a1"
+      ]
+    },
+    "why": "Iris cannot immediately follow Iris, and Elm is ineligible for this profile. After Mica plays, the Iris track is eligible. With a larger candidate set, more than one queue could meet the contract.",
+    "constraints": [
+      "Choose up to 12 tracks from at most 300 supplied candidates. Finish within 70 ms at p95.",
+      "Handle 7,500 peak queue refreshes/s. A skip must influence the next queue refresh within 10 seconds.",
+      "In the exploration treatment, expose at most 1 unfamiliar artist per 4-track block when feasible. Define unfamiliar using the listener’s past 30 days."
+    ],
+    "tasks": [
+      {
+        "title": "Build a sequence-aware baseline",
+        "prompt": "Give pseudocode for the baseline and show how hard exclusions and exploration limits interact with ranking. Trace the sample and an exhausted candidate pool.",
+        "check": "The trace checks the predecessor for every slot and preserves content eligibility. State a measurable target and whether an unfinished queue is preferable to violating a constraint."
+      },
+      {
+        "title": "Learn from listening events",
+        "prompt": "Specify impression, start, completion, save and skip events. Describe how to distinguish a deliberate rejection from the car losing its connection.",
+        "check": "Link events to a served queue and position. Specify a label window, treatment for missing end events and a split that avoids future listener behavior."
+      },
+      {
+        "title": "Test discovery over time",
+        "prompt": "Design a controlled comparison between the baseline and a learned sequencer. Measure immediate skip behavior and whether unfamiliar artists are replayed later.",
+        "check": "Include a listener-level assignment unit, observation window, meaningful discovery metric, and a guardrail for bad first-track experiences. Explain why exposed tracks dominate the historical labels."
+      }
+    ],
+    "twist": {
+      "event": "The treatment increases saves, but the share of active artists heard falls by a third.",
+      "prompt": "Describe one way this can happen and an experiment that determines whether broadening exposure improves discovery without harming listeners.",
+      "check": "Define both artist coverage and listener-level outcomes, preserve eligibility, and log where exploratory tracks were shown."
+    },
+    "sources": [
+      {
+        "title": "Spotify Research · Automatic Music Playlist Generation via Simulation-based Reinforcement Learning",
+        "url": "https://research.atspotify.com/2023/07/automatic-music-playlist-generation-via-simulation-based-reinforcement-learning"
+      }
+    ],
+    "group": "Recommendations",
+    "family": "Music",
+    "math": {
+      "family": "Music",
+      "prompt": "An early skip is a skip within 30 seconds of starting a track. On autoplay, 180 of 900 starts with a fully observed window skipped early. In a manually opened mix, 30 of 300 mature starts did. Another 50 starts per surface are too recent to classify. If the target launch mix is 25% autoplay and 75% manually opened, estimate its early-skip percentage from the mature cohorts.",
+      "unit": "%",
+      "answer": 12.5,
+      "tolerance": 0.001,
+      "explanation": "The mature rates are 180 / 900 = 20% for autoplay and 30 / 300 = 10% for the manually opened mix. Weight them by intended launch traffic: 0.25 × 20 + 0.75 × 10 = 12.5%."
+    },
+    "lessons": [
+      {
+        "title": "New users and new items",
+        "url": "https://www.tensortonic.com/ml-design/cold-start"
+      },
+      {
+        "title": "Retrieval and ranking metrics",
+        "url": "https://www.tensortonic.com/ml-design/ranking-metrics"
+      },
+      {
+        "title": "A/B testing and safe rollout",
+        "url": "https://www.tensortonic.com/ml-design/experiments"
+      },
+      {
+        "title": "Feedback loops and exposure bias",
+        "url": "https://www.tensortonic.com/ml-design/feedback-loops"
+      }
+    ],
+    "series": {
+      "title": "Spotify Music Recommendation",
+      "url": "https://www.tensortonic.com/ml-design/similar-listings"
+    }
+  },
+  {
+    "slug": "design-film-rows",
+    "walkthrough": "Let each producer submit its best eligible titles. Build the screen by repeatedly selecting the row with the highest incremental value after removing already displayed titles, then recheck regional rights at delivery. Cache row candidates longer than the rights signal and backfill from the next eligible item on expiry. Greedy selection fits a tight deadline but can sacrifice a better combination of later rows.",
+    "title": "Compose the first screen of a film festival app",
+    "topic": "Recommendation",
+    "minutes": 45,
+    "level": "Advanced",
+    "retrieval": false,
+    "brief": "A streaming festival has a small catalog with staggered regional rights. The TV app displays labeled rows such as Recently Added and Documentary. Row producers supply scored, overlapping candidates. Design the page composer that chooses which rows to show and which films occupy the limited visible slots.",
+    "inputs": "Each request has a region, row and slot limits, and eligible title proposals from row producers. A rights service independently declares which titles may be played in that region. A title can appear in multiple proposed rows.",
+    "outputs": "Return ordered rows containing ordered title IDs. The first screen must contain no duplicate title, unavailable title or empty row. If fewer rows are feasible, send a shorter page. Row and title scores are model preferences, so multiple valid pages can exist.",
+    "sampleIn": {
+      "region": "west",
+      "row_limit": 2,
+      "slots_per_row": 2,
+      "playable": [
+        "T2",
+        "T3",
+        "T4"
+      ],
+      "proposals": [
+        {
+          "row": "New",
+          "titles": [
+            "T1",
+            "T2",
+            "T3"
+          ]
+        },
+        {
+          "row": "Documentary",
+          "titles": [
+            "T3",
+            "T4"
+          ]
+        }
+      ]
+    },
+    "sampleOut": {
+      "rows": [
+        {
+          "row": "New",
+          "titles": [
+            "T2",
+            "T3"
+          ]
+        },
+        {
+          "row": "Documentary",
+          "titles": [
+            "T4"
+          ]
+        }
+      ]
+    },
+    "why": "T1 is unavailable in west and T3 can occupy only one slot. This example gives New first choice. Another valid composer could move T3 to Documentary if its page objective favors that placement.",
+    "constraints": [
+      "Compose up to 6 rows of 8 titles from 25 proposed rows within 110 ms at p95.",
+      "Serve 900,000 profile opens/day in 12 regions. Rights changes must be enforced within 2 minutes.",
+      "One fifth of the catalog premieres every week. Evaluation must separately report titles with fewer than 100 historical impressions."
+    ],
+    "tasks": [
+      {
+        "title": "Allocate scarce screen positions",
+        "prompt": "Explain how row utility depends on titles already placed. Compare a greedy baseline with one alternative, and trace when the greedy choice leaves a weak second row.",
+        "check": "Compare whole-page value on a concrete overlapping pair, enforce rights and deduplication, and describe behavior when all proposals for a row are exhausted."
+      },
+      {
+        "title": "Instrument a TV screen",
+        "prompt": "Define when a title counts as visible, including titles below the fold or behind horizontal scrolling. Specify labels for a deliberate viewing start.",
+        "check": "Separate rendered from visible impressions and distinguish trailer autoplay from intentional viewing. Split validation by festival day and by new title."
+      },
+      {
+        "title": "Serve a changing lineup",
+        "prompt": "Diagram cache keys, compositing, a failed row producer, and an expired right. Explain how an unseen premiere earns an initial score.",
+        "check": "A cached page cannot continue showing an expired title beyond the rights deadline. Give a cold-start baseline and a fallback that preserves region eligibility."
+      },
+      {
+        "title": "Decide whether the page wins",
+        "prompt": "Design an experiment testing whether viewers find a film worth continuing. A row-level click improvement alone cannot decide this experiment.",
+        "check": "Specify a page-level decision metric, guardrails for abandonment and novelty, assignment unit, run duration and a rollback criterion."
+      }
+    ],
+    "twist": {
+      "event": "A festival ends early in one region, invalidating the most popular title in four rows simultaneously.",
+      "prompt": "Trace the first page request after invalidation and explain how you detect a loss of page quality even if the rights filter remains correct.",
+      "check": "Show how replacements are selected across rows, what happens if capacity runs short, and how fill rate and viewing starts are monitored separately."
+    },
+    "sources": [
+      {
+        "title": "Netflix Technology Blog · Learning a Personalized Homepage",
+        "url": "https://netflixtechblog.com/learning-a-personalized-homepage-aa8ec670359a"
+      }
+    ],
+    "group": "Recommendations",
+    "family": "Streaming catalog recommendations",
+    "math": {
+      "family": "Streaming catalog recommendations",
+      "prompt": "A streaming service can add B or C beside title A. In a cohort of 10,000 sessions, 380 users would consider watching A, 330 would consider B and 240 would consider C. Among them, 250 would consider both A and B, while 100 would consider both A and C. A session is covered if it contains at least one title the user would consider. By how many percentage points would C beat B as the second title?",
+      "unit": "percentage points",
+      "answer": 0.6,
+      "tolerance": 0.001,
+      "explanation": "A+B covers 380 + 330 − 250 = 460 sessions. A+C covers 380 + 240 − 100 = 520. The difference is 60 / 10,000 × 100 = 0.6 percentage points."
+    },
+    "lessons": [
+      {
+        "title": "From business goal to ML task",
+        "url": "https://www.tensortonic.com/ml-design/ml-objective"
+      },
+      {
+        "title": "New users and new items",
+        "url": "https://www.tensortonic.com/ml-design/cold-start"
+      },
+      {
+        "title": "Retrieval and ranking metrics",
+        "url": "https://www.tensortonic.com/ml-design/ranking-metrics"
+      },
+      {
+        "title": "Error analysis and evaluation slices",
+        "url": "https://www.tensortonic.com/ml-design/error-analysis"
+      }
+    ],
+    "series": {
+      "title": "Netflix Recommendation System",
+      "url": "https://www.tensortonic.com/ml-design/event-recommendation"
+    }
+  },
+  {
+    "slug": "design-club-feed",
+    "walkthrough": "Filter the bounded pool using current club membership, mutes, visibility and event expiry before scoring. A light ranker combines estimated usefulness, freshness and impending deadlines. Freeze a ranked list of IDs for pagination, then recheck eligibility and remove shown IDs for each subsequent page. This keeps pagination predictable but can delay new notices until the next refresh.",
+    "title": "Rank a campus clubs feed before events expire",
+    "topic": "Feed ranking",
+    "minutes": 45,
+    "level": "Advanced",
+    "retrieval": false,
+    "brief": "A campus app supplies recent posts from a student’s clubs. A popular debate can attract reactions for days while a useful room change matters for an hour. Design a ranker for the supplied pool that gets time-sensitive information to people while respecting explicit mutes.",
+    "inputs": "The ranker accepts the viewer’s joined and muted clubs, request time, requested page size, and candidate posts with club ID, visibility, expiry, and optional engagement features. All times use UTC. Only active posts from joined, unmuted clubs are eligible.",
+    "outputs": "Return an ordered list of eligible post IDs with no duplicates. Scores and ranking policy are design choices. Explain how cursors avoid repeated posts within a browsing session when new posts arrive.",
+    "sampleIn": {
+      "now": "18:00Z",
+      "joined": [
+        "music",
+        "chess",
+        "drama"
+      ],
+      "muted": [
+        "drama"
+      ],
+      "limit": 2,
+      "posts": [
+        {
+          "id": "p1",
+          "club": "chess",
+          "visible": true,
+          "expires": "17:30Z"
+        },
+        {
+          "id": "p2",
+          "club": "music",
+          "visible": true,
+          "expires": "18:30Z",
+          "type": "room_change"
+        },
+        {
+          "id": "p3",
+          "club": "drama",
+          "visible": true,
+          "expires": "21:00Z"
+        },
+        {
+          "id": "p4",
+          "club": "chess",
+          "visible": true,
+          "expires": "22:00Z",
+          "type": "discussion"
+        }
+      ]
+    },
+    "sampleOut": {
+      "posts": [
+        "p2",
+        "p4"
+      ]
+    },
+    "why": "All timestamps in the fixture are on the same day. The earlier chess notice has expired and drama is muted. Putting the room change ahead of the discussion is one feasible choice for the stated goal.",
+    "constraints": [
+      "Rank at most 600 supplied candidates per request. Serve 4,000 peak requests/s at 80 ms p95.",
+      "Honor mutes and withdrawals within 15 seconds, including on paginated and cached feeds.",
+      "Only 3% of visible notices receive an explicit useful or unhelpful vote. Attendance confirmations arrive up to 48 hours later."
+    ],
+    "tasks": [
+      {
+        "title": "Define a useful impression",
+        "prompt": "Propose one primary objective that can reward a useful room change even when it receives no reaction. Compare it with a recency-only baseline and list ambiguous labels.",
+        "check": "Name the prediction target, label window and denominator. Explain what a missing vote means and how a user-level or survey signal could validate the target."
+      },
+      {
+        "title": "Rank and page safely",
+        "prompt": "Draw the multi-stage path from the bounded pool to two successive pages. Trace a mute, an expired notice, and a newly posted result between the two requests.",
+        "check": "Show where policy is checked at read time. State the consistency rule for page two and what happens when fresh filtering leaves a short page."
+      },
+      {
+        "title": "Detect feedback loops",
+        "prompt": "Design the impression log and a safe experiment that separates a post’s usefulness from its prominent position and its club’s size.",
+        "check": "Log position, policy version and an exposure denominator. Specify how randomized variation or a survey informs evaluation, plus a guardrail for small clubs."
+      },
+      {
+        "title": "Choose an operating point",
+        "prompt": "Estimate candidate evaluations/s at peak. Fit inference within the latency budget and give a fallback for a delayed feature stream.",
+        "check": "The upper bound is 2.4 million candidate evaluations/s before any pruning. State what the fallback can still filter, which signal it loses, and how you detect stale features."
+      }
+    ],
+    "twist": {
+      "event": "A niche club posts important schedule changes but members rarely vote. Its notices are disappearing after each retrain.",
+      "prompt": "Decide what evidence would justify a serving change and propose a controlled intervention.",
+      "check": "Measure eligible and visible notices by club size, account for position, and track student outcomes during a bounded intervention."
+    },
+    "sources": [
+      {
+        "title": "Engineering at Meta · How machine learning powers News Feed ranking",
+        "url": "https://engineering.fb.com/2021/01/26/ml-applications/news-feed-ranking/"
+      }
+    ],
+    "group": "Recommendations",
+    "family": "Social feed",
+    "math": {
+      "family": "Social feed",
+      "prompt": "A feed ranker fans out to four scoring shards in parallel. Each independently responds before the deadline with probability 0.98. The usual ranking policy can serve if at least three shards respond on time. What percentage of requests can use that policy without a fallback? Round to two decimal places.",
+      "unit": "%",
+      "answer": 99.766352,
+      "tolerance": 0.0051,
+      "explanation": "All four respond with probability 0.98⁴. Exactly three respond with probability 4 × 0.98³ × 0.02. Their sum is 0.99766352, or about 99.77%."
+    },
+    "lessons": [
+      {
+        "title": "From business goal to ML task",
+        "url": "https://www.tensortonic.com/ml-design/ml-objective"
+      },
+      {
+        "title": "A/B testing and safe rollout",
+        "url": "https://www.tensortonic.com/ml-design/experiments"
+      },
+      {
+        "title": "Monitoring and drift",
+        "url": "https://www.tensortonic.com/ml-design/monitoring"
+      },
+      {
+        "title": "Feedback loops and exposure bias",
+        "url": "https://www.tensortonic.com/ml-design/feedback-loops"
+      }
+    ],
+    "series": {
+      "title": "Facebook News Feed Ranking",
+      "url": "https://www.tensortonic.com/ml-design/personalized-news-feed"
+    }
+  },
+  {
+    "slug": "design-clip-review",
+    "walkthrough": "Apply cheap integrity checks and modality-specific classifiers first, then combine calibrated risks under the active policy. Auto-decide well-supported cases and route ambiguous cases to language-aware queues with an appeals reservation and backlog alarm. Log every disposition as an event linked to the evidence, and use an independent random audit to estimate misses among published clips. Stricter hold thresholds can reduce immediate exposure while increasing wait times, so test against actual reviewer capacity.",
+    "title": "Triage multilingual clips with a finite review queue",
+    "topic": "Trust and safety",
+    "minutes": 50,
+    "level": "Advanced",
+    "retrieval": false,
+    "brief": "A community highlights app accepts short clips that combine images, speech and captions supplied by the creator. The policy team gives you labeled examples and a versioned rulebook. Design an upload decision service and human review queue for a launch in three languages. Editors can appeal a decision.",
+    "inputs": "An upload has a clip ID, media references, optional transcript, detected language, arrival time and policy version. The example shows the calibrated component scores available after feature extraction. A routing decision may require missing evidence.",
+    "outputs": "Return a disposition of publish, hold_for_review or remove with a policy version and internal reason code. A held clip stays unpublished until resolution. Explain how a later appeal updates the recorded decision without erasing the previous one.",
+    "sampleIn": {
+      "clip_id": "C17",
+      "language": "L3",
+      "policy_version": "p6",
+      "media": {
+        "frames": true,
+        "audio": true
+      },
+      "transcript": null,
+      "signals": {
+        "visual_risk": 0.13,
+        "audio_risk": 0.79,
+        "language_validation_support": "low"
+      }
+    },
+    "sampleOut": {
+      "clip_id": "C17",
+      "disposition": "hold_for_review",
+      "policy_version": "p6",
+      "reason_code": "language_specialist_needed"
+    },
+    "why": "One defensible policy sends conflicting evidence in an under-validated language to a specialist. The scores alone do not justify automatic removal. Other routing choices require explicit calibration and harm assumptions.",
+    "constraints": [
+      "At peak, 80,000 clips arrive per hour. Six reviewers can each resolve 40 clips/hour, including appeals. Reserve at least 10% of capacity for appeals.",
+      "Issue an initial disposition within 8 seconds at p95. At least 95% of held clips should receive a decision within 2 hours during steady operation.",
+      "Audit a random sample of 1,000 published clips per week and report estimates separately for each launch language, including uncertainty."
+    ],
+    "tasks": [
+      {
+        "title": "Budget review decisions",
+        "prompt": "Calculate the largest steady-state share of uploads eligible for review after the appeal reservation. Decide how to allocate that capacity by uncertainty, severity, language and age.",
+        "check": "216 new review slots/hour covers at most 0.27% of peak uploads before headroom. Address arrival bursts and specialist bottlenecks rather than treating the bound as a safe target."
+      },
+      {
+        "title": "Calibrate three actions",
+        "prompt": "Specify which labels and policy versions train the baseline, how you combine conflicting modalities, and how you set class- or language-specific thresholds.",
+        "check": "Define asymmetric error costs and report precision of automatic removal plus harmful prevalence among published clips. Include a missing-transcript path and threshold validation on held-out data."
+      },
+      {
+        "title": "Close the appeal loop",
+        "prompt": "Diagram the immutable decision history from upload to appeal. Explain how overturned decisions and randomly audited published clips enter evaluation.",
+        "check": "Record model, policy, timestamps and reviewer outcomes. Distinguish biased appealed examples from a random audit and prevent repeated uploads of the same clip crossing the test split."
+      },
+      {
+        "title": "Watch for harm during rollout",
+        "prompt": "Choose a staged release plan and a rollback trigger. Estimate how many audit labels reach a low-volume language and explain what you can infer from zero observed misses.",
+        "check": "Show why zero observed misses can leave substantial uncertainty, and specify how a targeted oversample would be reweighted or reported separately."
+      }
+    ],
+    "twist": {
+      "event": "A viral event doubles incoming clips in one language for four hours while its only specialist is unavailable.",
+      "prompt": "Show how the queue evolves, what creators see, and which service target may be missed under your fallback.",
+      "check": "State the available service rate and backlog assumption, preserve policy and appeal history, and define a recovery or escalation path with an explicit owner."
+    },
+    "sources": [
+      {
+        "title": "TikTok · Advancing our approach to user safety",
+        "url": "https://newsroom.tiktok.com/advancing-our-approach-to-user-safety?lang=en"
+      }
+    ],
+    "group": "Risk and trust",
+    "family": "Moderation",
+    "math": {
+      "family": "Moderation",
+      "prompt": "A moderation queue receives 30,000 uploads per hour. Twenty reviewers can each finish 12 cases per hour, and 25% of their capacity is reserved for appeals. A disjoint audit queue already consumes 30 of the remaining reviews per hour. What maximum percentage of all uploads may the model refer for new manual review while keeping mean demand at or below the remaining capacity?",
+      "unit": "%",
+      "answer": 0.5,
+      "tolerance": 0.001,
+      "explanation": "The team can complete 240 cases per hour. After reserving 60 for appeals and 30 for audits, 150 slots remain. The mean-load ceiling is 150 / 30,000 × 100 = 0.5%. Running below it leaves room for arrival spikes."
+    },
+    "lessons": [
+      {
+        "title": "Rare events and class imbalance",
+        "url": "https://www.tensortonic.com/ml-design/sampling"
+      },
+      {
+        "title": "Classification metrics and thresholds",
+        "url": "https://www.tensortonic.com/ml-design/classification-metrics"
+      },
+      {
+        "title": "Error analysis and evaluation slices",
+        "url": "https://www.tensortonic.com/ml-design/error-analysis"
+      },
+      {
+        "title": "Walkthrough: Content Moderation System Design",
+        "url": "https://www.tensortonic.com/ml-design/interview-walkthrough-moderation"
+      }
+    ],
+    "series": {
+      "title": "TikTok Content Moderation",
+      "url": "https://www.tensortonic.com/ml-design/harmful-content-detection"
+    }
+  }
+]
